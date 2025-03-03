@@ -20,30 +20,14 @@
 */
 #include "SDL_internal.h"
 
-#include "../../core/winrt/SDL_winrtapp_direct3d.h"
-#include "../../core/winrt/SDL_winrtapp_xaml.h"
+#ifndef SDL_winrtgamebar_h_
+#define SDL_winrtgamebar_h_
 
-#include <wrl.h>
-
-extern "C"
-int SDL_RunApp(int, char**, SDL_main_func mainFunction, void * xamlBackgroundPanel)
-{
-#ifndef __XBOXSERIES__
-    if (xamlBackgroundPanel) {
-        if (!SDL_WinRTInitXAMLApp(mainFunction, xamlBackgroundPanel)) {
-            return 1;
-        }
-    } else {
+#ifdef __cplusplus
+/* These are exported as C++ functions, rather than C, to fix a compilation
+   bug with MSVC 2013, for Windows 8.x builds. */
+extern void WINRT_InitGameBar(SDL_VideoDevice *_this);
+extern void WINRT_QuitGameBar(SDL_VideoDevice *_this);
 #endif
-        if (FAILED(Windows::Foundation::Initialize(RO_INIT_MULTITHREADED))) {
-            return 1;
-        }
-        if (!SDL_WinRTInitNonXAMLApp(mainFunction)) {
-            return 1;
-        }
-#ifndef __XBOXSERIES__
-    }
-#endif
-    return 0;
-}
 
+#endif // SDL_winrtgamebar_h_

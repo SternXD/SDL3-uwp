@@ -20,9 +20,18 @@
 */
 #include "SDL_internal.h"
 
-#ifdef SDL_VIDEO_DRIVER_WINDOWS
+#if SDL_VIDEO_DRIVER_WINDOWS || SDL_VIDEO_DRIVER_WINRT
 
+#ifdef SDL_PLATFORM_WINRT
+#include "..\winrt\SDL_winrtvideo_cpp.h"
+#include "SDL_windowsopengl.h"
+
+/* Sets an error message based on GetLastError(). Always return -1. */
+extern int WIN_SetError(const char *prefix);
+
+#else
 #include "SDL_windowsvideo.h"
+#endif
 #include "SDL_windowsopengles.h"
 #include "../../SDL_hints_c.h"
 
@@ -231,9 +240,12 @@ bool WIN_GL_LoadLibrary(SDL_VideoDevice *_this, const char *path)
        SDL_GL_ExtensionSupported and SDL_GL_GetProcAddress as they are
        public API functions.
     */
+    // TODO
+    #ifndef SDL_PLATFORM_WINRT
     ++_this->gl_config.driver_loaded;
     WIN_GL_InitExtensions(_this);
     --_this->gl_config.driver_loaded;
+#endif
 
     return true;
 }
@@ -434,6 +446,7 @@ static bool HasExtension(const char *extension, const char *extensions)
     return false;
 }
 
+#ifndef SDL_PLATFORM_WINRT
 void WIN_GL_InitExtensions(SDL_VideoDevice *_this)
 {
     /* *INDENT-OFF* */ // clang-format off
@@ -555,6 +568,7 @@ void WIN_GL_InitExtensions(SDL_VideoDevice *_this)
     DestroyWindow(hwnd);
     WIN_PumpEventsForHWND(_this, hwnd);
 }
+#endif
 
 static int WIN_GL_ChoosePixelFormatARB(SDL_VideoDevice *_this, int *iAttribs, float *fAttribs)
 {
@@ -949,4 +963,4 @@ bool WIN_GL_DestroyContext(SDL_VideoDevice *_this, SDL_GLContext context)
 
 #endif // SDL_VIDEO_OPENGL_WGL
 
-#endif // SDL_VIDEO_DRIVER_WINDOWS
+#endif // SDL_VIDEO_DRIVER_WINDOWS || SDL_VIDEO_DRIVER_WINRT

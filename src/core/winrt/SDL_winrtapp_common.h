@@ -20,30 +20,12 @@
 */
 #include "SDL_internal.h"
 
-#include "../../core/winrt/SDL_winrtapp_direct3d.h"
-#include "../../core/winrt/SDL_winrtapp_xaml.h"
+#ifndef SDL_winrtapp_common_h_
+#define SDL_winrtapp_common_h_
 
-#include <wrl.h>
+/* A pointer to the app's C-style main() function (which is a different
+   function than the WinRT app's actual entry point).
+ */
+extern int (*WINRT_SDLAppEntryPoint)(int, char **);
 
-extern "C"
-int SDL_RunApp(int, char**, SDL_main_func mainFunction, void * xamlBackgroundPanel)
-{
-#ifndef __XBOXSERIES__
-    if (xamlBackgroundPanel) {
-        if (!SDL_WinRTInitXAMLApp(mainFunction, xamlBackgroundPanel)) {
-            return 1;
-        }
-    } else {
-#endif
-        if (FAILED(Windows::Foundation::Initialize(RO_INIT_MULTITHREADED))) {
-            return 1;
-        }
-        if (!SDL_WinRTInitNonXAMLApp(mainFunction)) {
-            return 1;
-        }
-#ifndef __XBOXSERIES__
-    }
-#endif
-    return 0;
-}
-
+#endif // SDL_winrtapp_common_h_
