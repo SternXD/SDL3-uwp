@@ -437,7 +437,7 @@ void WIN_GL_InitExtensions(SDL_VideoDevice *_this)
         return;
     }
 
-    #ifdef SDL2_PLATFORM_WINRT
+    #ifdef SDL_PLATFORM_WINRT
     hwnd = uwp_window_handle();
     #else
     hwnd =
