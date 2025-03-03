@@ -84,7 +84,7 @@ void SDL_BroadcastCondition(SDL_Condition *cond)
 }
 
 extern "C"
-SDL_bool SDL_WaitConditionTimeoutNS(SDL_Condition *cond, SDL_Mutex *mutex, Sint64 timeoutNS)
+bool SDL_WaitConditionTimeoutNS(SDL_Condition *cond, SDL_Mutex *mutex, Sint64 timeoutNS)
 {
     if (!cond || !mutex) {
         return true;
