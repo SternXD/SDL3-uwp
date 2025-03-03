@@ -20,30 +20,19 @@
 */
 #include "SDL_internal.h"
 
-#include "../../core/winrt/SDL_winrtapp_direct3d.h"
-#include "../../core/winrt/SDL_winrtapp_xaml.h"
+#ifndef SDL_winrtmouse_h_
+#define SDL_winrtmouse_h_
 
-#include <wrl.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-extern "C"
-int SDL_RunApp(int, char**, SDL_main_func mainFunction, void * xamlBackgroundPanel)
-{
-#ifndef __XBOXSERIES__
-    if (xamlBackgroundPanel) {
-        if (!SDL_WinRTInitXAMLApp(mainFunction, xamlBackgroundPanel)) {
-            return 1;
-        }
-    } else {
-#endif
-        if (FAILED(Windows::Foundation::Initialize(RO_INIT_MULTITHREADED))) {
-            return 1;
-        }
-        if (!SDL_WinRTInitNonXAMLApp(mainFunction)) {
-            return 1;
-        }
-#ifndef __XBOXSERIES__
-    }
-#endif
-    return 0;
+extern void WINRT_InitMouse(SDL_VideoDevice *_this);
+extern void WINRT_QuitMouse(SDL_VideoDevice *_this);
+extern bool WINRT_UsingRelativeMouseMode;
+
+#ifdef __cplusplus
 }
+#endif
 
+#endif // SDL_winrtmouse_h_
