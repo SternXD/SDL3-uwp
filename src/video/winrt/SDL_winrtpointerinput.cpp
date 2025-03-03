@@ -229,7 +229,7 @@ void WINRT_ProcessPointerPressedEvent(SDL_Window *window, Windows::UI::Input::Po
             WINRT_TouchID,
             (SDL_FingerID)(pointerPoint->PointerId + 1),
             window,
-            true,
+            SDL_EVENT_FINGER_DOWN,
             normalizedPoint.X,
             normalizedPoint.Y,
             pointerPoint->Properties->Pressure);
@@ -282,7 +282,7 @@ void WINRT_ProcessPointerReleasedEvent(SDL_Window *window, Windows::UI::Input::P
             WINRT_TouchID,
             (SDL_FingerID)(pointerPoint->PointerId + 1),
             window,
-            false,
+            SDL_EVENT_FINGER_UP,
             normalizedPoint.X,
             normalizedPoint.Y,
             pointerPoint->Properties->Pressure);
