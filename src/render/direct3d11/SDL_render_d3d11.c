@@ -24,7 +24,9 @@
 
 #define COBJMACROS
 #include "../../core/windows/SDL_windows.h"
+#ifndef SDL_PLATFORM_WINRT
 #include "../../video/windows/SDL_windowswindow.h"
+#endif
 #include "../SDL_sysrender.h"
 #include "../SDL_d3dmath.h"
 #include "../../video/SDL_pixels_c.h"
@@ -39,6 +41,27 @@
 
 #include "SDL_shaders_d3d11.h"
 
+#ifdef SDL_PLATFORM_WINRT
+
+#if NTDDI_VERSION > NTDDI_WIN8
+#include <dxgi1_3.h>
+#endif
+
+#include "SDL_render_winrt.h"
+
+#if WINAPI_FAMILY == WINAPI_FAMILY_APP
+#include <windows.ui.xaml.media.dxinterop.h>
+// TODO, WinRT, XAML: get the ISwapChainBackgroundPanelNative from something other than a global var
+extern ISwapChainBackgroundPanelNative *WINRT_GlobalSwapChainBackgroundPanelNative;
+#endif // WINAPI_FAMILY == WINAPI_FAMILY_APP
+
+#endif // SDL_PLATFORM_WINRT
+
+#if defined(_MSC_VER) && !defined(__clang__)
+#define SDL_COMPOSE_ERROR(str) __FUNCTION__ ", " str
+#else
+#define SDL_COMPOSE_ERROR(str) SDL_STRINGIFY_ARG(__FUNCTION__) ", " str
+#endif
 #define SAFE_RELEASE(X)                                   \
     if ((X)) {                                            \
         IUnknown_Release(SDL_static_cast(IUnknown *, X)); \
@@ -220,6 +243,9 @@ static const GUID SDL_IID_IDXGIFactory5 = { 0x7632e1f5, 0xee65, 0x4dca, { 0x87, 
 #endif
 static const GUID SDL_IID_IDXGIFactory2 = { 0x50c83a1c, 0xe072, 0x4c48, { 0x87, 0xb0, 0x36, 0x30, 0xfa, 0x36, 0xa6, 0xd0 } };
 static const GUID SDL_IID_IDXGIDevice1 = { 0x77db970f, 0x6276, 0x48ba, { 0xba, 0x28, 0x07, 0x01, 0x43, 0xb4, 0x39, 0x2c } };
+#if defined(SDL_PLATFORM_WINRT) && NTDDI_VERSION > NTDDI_WIN8
+static const GUID SDL_IID_IDXGIDevice3 = { 0x6007896c, 0x3244, 0x4afd, { 0xbf, 0x18, 0xa6, 0xd3, 0xbe, 0xda, 0x50, 0x23 } };
+#endif
 static const GUID SDL_IID_ID3D11Texture2D = { 0x6f15aaf2, 0xd208, 0x4e89, { 0x9a, 0xb4, 0x48, 0x95, 0x35, 0xd3, 0x4f, 0x9c } };
 static const GUID SDL_IID_ID3D11Device1 = { 0xa04bfb29, 0x08ef, 0x43d6, { 0xa4, 0x9c, 0xa9, 0xbd, 0xbd, 0xcb, 0xe6, 0x86 } };
 static const GUID SDL_IID_ID3D11DeviceContext1 = { 0xbb2c6faa, 0xb5fb, 0x4082, { 0x8e, 0x6b, 0x38, 0x8b, 0x8c, 0xfa, 0x90, 0xe1 } };
@@ -553,11 +579,16 @@ static HRESULT D3D11_CreateDeviceResources(SDL_Renderer *renderer)
     // See if we need debug interfaces
     createDebug = SDL_GetHintBoolean(SDL_HINT_RENDER_DIRECT3D11_DEBUG, false);
 
+#ifdef SDL_PLATFORM_WINRT
+    CreateDXGIFactory2Func = CreateDXGIFactory2;
+    D3D11CreateDeviceFunc = D3D11CreateDevice;
+#else
     data->hDXGIMod = SDL_LoadObject("dxgi.dll");
     if (!data->hDXGIMod) {
         result = E_FAIL;
         goto done;
     }
+#endif // SDL_PLATFORM_WINRT
 
     pCreateDXGIFactory2 = (pfnCreateDXGIFactory2)SDL_LoadFunction(data->hDXGIMod, "CreateDXGIFactory2");
     if (!pCreateDXGIFactory2) {
@@ -854,7 +885,13 @@ static bool D3D11_GetViewportAlignedD3DRect(SDL_Renderer *renderer, const SDL_Re
 static HRESULT D3D11_CreateSwapChain(SDL_Renderer *renderer, int w, int h)
 {
     D3D11_RenderData *data = (D3D11_RenderData *)renderer->internal;
+#ifdef SDL_PLATFORM_WINRT
+    IUnknown *coreWindow = D3D11_GetCoreWindowFromSDLRenderer(renderer);
+    const BOOL usingXAML = (!coreWindow);
+#else
     IUnknown *coreWindow = NULL;
+    const BOOL usingXAML = FALSE;
+#endif
     IDXGISwapChain3 *swapChain3 = NULL;
     HRESULT result = S_OK;
 
@@ -879,10 +916,19 @@ static HRESULT D3D11_CreateSwapChain(SDL_Renderer *renderer, int w, int h)
     swapChainDesc.SampleDesc.Quality = 0;
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     swapChainDesc.BufferCount = 2; // Use double-buffering to minimize latency.
-    if (WIN_IsWindows8OrGreater()) {
-        swapChainDesc.Scaling = DXGI_SCALING_NONE;
-    } else {
+#if SDL_WINAPI_FAMILY_PHONE
+    swapChainDesc.Scaling = DXGI_SCALING_STRETCH;        // On phone, only stretch and aspect-ratio stretch scaling are allowed.
+    swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD; // On phone, no swap effects are supported.
+    // TODO, WinRT: see if Win 8.x DXGI_SWAP_CHAIN_DESC1 settings are available on Windows Phone 8.1, and if there's any advantage to having them on
+#else
+    if (usingXAML) {
         swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
+    } else {
+        if (WIN_IsWindows8OrGreater()) {
+            swapChainDesc.Scaling = DXGI_SCALING_NONE;
+        } else {
+            swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
+        }
     }
     if (SDL_GetWindowFlags(renderer->window) & SDL_WINDOW_TRANSPARENT) {
         swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
@@ -890,6 +936,7 @@ static HRESULT D3D11_CreateSwapChain(SDL_Renderer *renderer, int w, int h)
     } else {
         swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL; // All Windows Store apps must use this SwapEffect.
     }
+#endif // SDL_WINAPI_FAMILY_PHONE
     swapChainDesc.Flags = data->swapChainFlags;
 
     if (coreWindow) {
@@ -903,6 +950,28 @@ static HRESULT D3D11_CreateSwapChain(SDL_Renderer *renderer, int w, int h)
             WIN_SetErrorFromHRESULT("IDXGIFactory2::CreateSwapChainForCoreWindow", result);
             goto done;
         }
+    } else if (usingXAML) {
+        result = IDXGIFactory2_CreateSwapChainForComposition(data->dxgiFactory,
+                                                             (IUnknown *)data->d3dDevice,
+                                                             &swapChainDesc,
+                                                             NULL,
+                                                             &data->swapChain);
+        if (FAILED(result)) {
+            WIN_SetErrorFromHRESULT(SDL_COMPOSE_ERROR("IDXGIFactory2::CreateSwapChainForComposition"), result);
+            goto done;
+        }
+
+#if WINAPI_FAMILY == WINAPI_FAMILY_APP
+        result = ISwapChainBackgroundPanelNative_SetSwapChain(WINRT_GlobalSwapChainBackgroundPanelNative, (IDXGISwapChain *)data->swapChain);
+        if (FAILED(result)) {
+            WIN_SetErrorFromHRESULT(SDL_COMPOSE_ERROR("ISwapChainBackgroundPanelNative::SetSwapChain"), result);
+            goto done;
+        }
+#else
+        SDL_SetError(SDL_COMPOSE_ERROR("XAML support is not yet available for Windows Phone"));
+        result = E_FAIL;
+        goto done;
+#endif
     } else {
 #if defined(SDL_PLATFORM_WIN32) || defined(SDL_PLATFORM_WINGDK)
         HWND hwnd = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(renderer->window), SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
@@ -1012,7 +1081,11 @@ static HRESULT D3D11_CreateWindowSizeDependentResources(SDL_Renderer *renderer)
     /* The width and height of the swap chain must be based on the display's
      * non-rotated size.
      */
+#ifdef SDL_PLATFORM_WINRT
+    SDL_GetWindowSize(renderer->window, &w, &h);
+#else
     SDL_GetWindowSizeInPixels(renderer->window, &w, &h);
+#endif
     data->rotation = D3D11_GetCurrentRotation();
     // SDL_Log("%s: windowSize={%d,%d}, orientation=%d", SDL_FUNCTION, w, h, (int)data->rotation);
     if (D3D11_IsDisplayRotated90Degrees(data->rotation)) {
@@ -1022,6 +1095,8 @@ static HRESULT D3D11_CreateWindowSizeDependentResources(SDL_Renderer *renderer)
     }
 
     if (data->swapChain) {
+// IDXGISwapChain::ResizeBuffers is not available on Windows Phone 8.
+#if !defined(SDL_PLATFORM_WINRT) || !SDL_WINAPI_FAMILY_PHONE
         // If the swap chain already exists, resize it.
         result = IDXGISwapChain_ResizeBuffers(data->swapChain,
                                               0,
@@ -1032,6 +1107,7 @@ static HRESULT D3D11_CreateWindowSizeDependentResources(SDL_Renderer *renderer)
             WIN_SetErrorFromHRESULT("IDXGISwapChain::ResizeBuffers", result);
             goto done;
         }
+#endif
     } else {
         result = D3D11_CreateSwapChain(renderer, w, h);
         if (FAILED(result) || !data->swapChain) {
@@ -1041,7 +1117,24 @@ static HRESULT D3D11_CreateWindowSizeDependentResources(SDL_Renderer *renderer)
 
     D3D11_UpdatePresentFlags(renderer);
 
-    // Set the proper rotation for the swap chain.
+#if !SDL_WINAPI_FAMILY_PHONE
+    /* Set the proper rotation for the swap chain.
+     *
+     * To note, the call for this, IDXGISwapChain1::SetRotation, is not necessary
+     * on Windows Phone 8.0, nor is it supported there.
+     *
+     * IDXGISwapChain1::SetRotation does seem to be available on Windows Phone 8.1,
+     * however I've yet to find a way to make it work.  It might have something to
+     * do with IDXGISwapChain::ResizeBuffers appearing to not being available on
+     * Windows Phone 8.1 (it wasn't on Windows Phone 8.0), but I'm not 100% sure of this.
+     * The call doesn't appear to be entirely necessary though, and is a performance-related
+     * call, at least according to the following page on MSDN:
+     * http://code.msdn.microsoft.com/windowsapps/DXGI-swap-chain-rotation-21d13d71
+     *   -- David L.
+     *
+     * TODO, WinRT: reexamine the docs for IDXGISwapChain1::SetRotation, see if might be available, usable, and prudent-to-call on WinPhone 8.1
+     */
+#endif
     if (WIN_IsWindows8OrGreater()) {
         if (data->swapEffect == DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL) {
             result = IDXGISwapChain1_SetRotation(data->swapChain, data->rotation);
@@ -1051,6 +1144,7 @@ static HRESULT D3D11_CreateWindowSizeDependentResources(SDL_Renderer *renderer)
             }
         }
     }
+#endif
 
     result = IDXGISwapChain_GetBuffer(data->swapChain,
                                       0,
@@ -1115,6 +1209,26 @@ static bool D3D11_HandleDeviceLost(SDL_Renderer *renderer)
 static HRESULT D3D11_UpdateForWindowSizeChange(SDL_Renderer *renderer)
 {
     return D3D11_CreateWindowSizeDependentResources(renderer);
+}
+
+void D3D11_Trim(SDL_Renderer *renderer)
+{
+#ifdef SDL_PLATFORM_WINRT
+#if NTDDI_VERSION > NTDDI_WIN8
+    D3D11_RenderData *data = (D3D11_RenderData *)renderer->internal;
+    HRESULT result = S_OK;
+    IDXGIDevice3 *dxgiDevice = NULL;
+
+    result = ID3D11Device_QueryInterface(data->d3dDevice, &SDL_IID_IDXGIDevice3, &dxgiDevice);
+    if (FAILED(result)) {
+        // WIN_SetErrorFromHRESULT(__FUNCTION__ ", ID3D11Device to IDXGIDevice3", result);
+        return;
+    }
+
+    IDXGIDevice3_Trim(dxgiDevice);
+    SAFE_RELEASE(dxgiDevice);
+#endif
+#endif
 }
 
 static void D3D11_WindowEvent(SDL_Renderer *renderer, const SDL_WindowEvent *event)
@@ -1790,6 +1904,8 @@ static bool D3D11_LockTexture(SDL_Renderer *renderer, SDL_Texture *texture,
      * have the ability to write a CPU-bound pixel buffer to a rectangular
      * subrect of a texture.  Direct3D 11.1 can, however, write a pixel
      * buffer to an entire texture, hence the use of a staging texture.
+     *
+     * TODO, WinRT: consider avoiding the use of a staging texture in D3D11_LockTexture if/when the entire texture is being updated
      */
     ID3D11Texture2D_GetDesc(textureData->mainTexture, &stagingTextureDesc);
     stagingTextureDesc.Width = rect->w;
@@ -2126,6 +2242,7 @@ static bool D3D11_UpdateViewport(SDL_Renderer *renderer)
         orientationAlignedViewport.h = (float)viewport->h;
     }
 
+    // TODO, WinRT: get custom viewports working with non-Landscape modes (Portrait, PortraitFlipped, and LandscapeFlipped)
     d3dviewport.TopLeftX = orientationAlignedViewport.x;
     d3dviewport.TopLeftY = orientationAlignedViewport.y;
     d3dviewport.Width = orientationAlignedViewport.w;
@@ -2857,10 +2974,15 @@ static bool D3D11_RenderPresent(SDL_Renderer *renderer)
 
     SDL_zero(parameters);
 
+#if SDL_WINAPI_FAMILY_PHONE
+    result = IDXGISwapChain_Present(data->swapChain, data->syncInterval, data->presentFlags);
+#else
     /* The application may optionally specify "dirty" or "scroll"
      * rects to improve efficiency in certain scenarios.
+     * This option is not available on Windows Phone 8, to note.
      */
     result = IDXGISwapChain1_Present1(data->swapChain, data->syncInterval, data->presentFlags, &parameters);
+#endif
 
     // When the present flips, it unbinds the current view, so bind it again on the next draw call
     data->currentRenderTargetView = NULL;
@@ -2868,6 +2990,8 @@ static bool D3D11_RenderPresent(SDL_Renderer *renderer)
     if (FAILED(result) && result != DXGI_ERROR_WAS_STILL_DRAWING) {
         /* If the device was removed either by a disconnect or a driver upgrade, we
          * must recreate all device resources.
+         *
+         * TODO, WinRT: consider throwing an exception if D3D11_RenderPresent fails, especially if there is a way to salvage debug info from users' machines
          */
         if (result == DXGI_ERROR_DEVICE_REMOVED) {
             if (D3D11_HandleDeviceLost(renderer)) {
@@ -2890,6 +3014,23 @@ static bool D3D11_RenderPresent(SDL_Renderer *renderer)
 static bool D3D11_SetVSync(SDL_Renderer *renderer, const int vsync)
 {
     D3D11_RenderData *data = (D3D11_RenderData *)renderer->internal;
+
+#if SDL_WINAPI_FAMILY_PHONE
+    /* VSync is required in Windows Phone, at least for Win Phone 8.0 and 8.1.
+     * Failure to use it seems to either result in:
+     *
+     *  - with the D3D11 debug runtime turned OFF, vsync seemingly gets turned
+     *    off (framerate doesn't get capped), but nothing appears on-screen
+     *
+     *  - with the D3D11 debug runtime turned ON, vsync gets automatically
+     *    turned back on, and the following gets output to the debug console:
+     *
+     *    DXGI ERROR: IDXGISwapChain::Present: Interval 0 is not supported, changed to Interval 1. [ UNKNOWN ERROR #1024: ]
+     */
+    if (vsync == 0) {
+        return SDL_Unsupported();
+    }
+#endif
 
     if (vsync < 0) {
         return SDL_Unsupported();

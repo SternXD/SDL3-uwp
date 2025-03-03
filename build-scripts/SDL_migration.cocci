@@ -3238,6 +3238,11 @@ typedef SDL_Colour, SDL_Color;
 + SDL_Color
 @@
 @@
+- SDL_WinRTGetFSPathUTF8
++ SDL_GetWinRTFSPath
+  (...)
+@@
+@@
 - SDL_iPhoneSetAnimationCallback
 + SDL_SetiOSAnimationCallback
   (...)
@@ -3640,6 +3645,11 @@ typedef SDL_Colour, SDL_Color;
 @@
 - SDL_GDKGetTaskQueue
 + SDL_GetGDKTaskQueue
+  (...)
+@@
+@@
+- SDL_WinRTGetDeviceFamily
++ SDL_GetWinRTDeviceFamily
   (...)
 @@
 @@

@@ -373,7 +373,7 @@
 #endif
 
 #if WINAPI_FAMILY_WINRT
-#error Windows RT/UWP is no longer supported in SDL
+#define SDL_PLATFORM_WINRT   1
 
 #elif defined(_GAMING_DESKTOP) /* GDK project configuration always defines _GAMING_XXX */
 
