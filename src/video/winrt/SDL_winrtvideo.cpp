@@ -607,6 +607,16 @@ static bool WINRT_IsCoreWindowActive(CoreWindow ^ coreWindow)
     return true;
 }
 
+extern "C" {
+HWND uwp_window_handle()
+{
+    CoreWindow ^ coreWindow = CoreWindow::GetForCurrentThread();
+    Platform::Agile<Windows::UI::Core::CoreWindow> m_window;
+    m_window = coreWindow;
+    return (HWND) reinterpret_cast<IUnknown *>(m_window.Get());
+}
+}
+
 bool WINRT_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_PropertiesID create_props)
 {
     // Make sure that only one window gets created, at least until multimonitor
