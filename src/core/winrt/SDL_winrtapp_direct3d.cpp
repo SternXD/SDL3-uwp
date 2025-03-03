@@ -155,7 +155,8 @@ static void WINRT_ProcessWindowSizeChange() // TODO: Pass an SDL_Window-identify
 }
 
 SDL_WinRTApp::SDL_WinRTApp() : m_windowClosed(false),
-                               m_windowVisible(true)
+                               m_windowVisible(true),
+                               m_launchOnExit("")
 {
 }
 
@@ -326,9 +327,24 @@ void SDL_WinRTApp::Load(Platform::String ^ entryPoint)
 {
 }
 
+void SDL_WinRTApp::App_BackRequested(
+    Platform::Object ^ sender,
+    Windows::UI::Core::BackRequestedEventArgs ^ e)
+{
+    e->Handled = true;
+}
+
 void SDL_WinRTApp::Run()
 {
+    auto navigation = Windows::UI::Core::SystemNavigationManager::GetForCurrentView();
+    // UWP on Xbox One triggers a back request whenever the B button is
+    // pressed which can result in the app being suspended if unhandled
+    navigation->BackRequested += ref new Windows::Foundation::EventHandler<
+        Windows::UI::Core::BackRequestedEventArgs ^>(
+        this, &SDL_WinRTApp::App_BackRequested);
+
     SDL_SetMainReady();
+
     if (WINRT_SDLAppEntryPoint) {
         // TODO, WinRT: pass the C-style main() a reasonably realistic
         // representation of command line arguments.
@@ -342,6 +358,20 @@ void SDL_WinRTApp::Run()
         WINRT_SDLAppEntryPoint(argc, argv);
         SDL_free(argv[0]);
         SDL_free(argv);
+    }
+
+    //Retropass handler
+    if (!m_launchOnExit->IsEmpty()) {
+        Windows::Foundation::Uri ^ m_uri = ref new Windows::Foundation::Uri(m_launchOnExit);
+        auto asyncOperation =
+            Windows::System::Launcher::LaunchUriAsync(m_uri);
+        asyncOperation->Completed = ref new Windows::Foundation::AsyncOperationCompletedHandler<bool>(
+            [](Windows::Foundation::IAsyncOperation<bool> const ^
+                   sender,
+               Windows::Foundation::AsyncStatus const asyncStatus) {
+                CoreApplication::Exit();
+                return;
+            });
     }
 }
 
@@ -577,6 +607,38 @@ void SDL_WinRTApp::OnWindowClosed(CoreWindow ^ sender, CoreWindowEventArgs ^ arg
 void SDL_WinRTApp::OnAppActivated(CoreApplicationView ^ applicationView, IActivatedEventArgs ^ args)
 {
     CoreWindow::GetForCurrentThread()->Activate();
+
+    if (args->Kind ==
+        Windows::ApplicationModel::Activation::ActivationKind::Protocol) {
+
+        auto protocolActivatedEventArgs = (Windows::ApplicationModel::Activation::
+            ProtocolActivatedEventArgs^)(args);
+        auto query = protocolActivatedEventArgs->Uri->QueryParsed;
+
+        for (uint32_t i = 0; i < query->Size; i++) {
+            auto arg = query->GetAt(i);
+
+            // parse command line string
+            if (arg->Name == L"cmd") {
+                std::wstring argVal(arg->Value->Begin(), arg->Value->End());
+                // Strip the executable from the cmd argument
+                //if (argVal.rfind(L".exe", 0) == 0) {
+                //    argVal = argVal.substr(15, argVal.length());
+                //}
+
+                //std::istringstream iss(argVal);
+                //std::string s;
+
+                //// Maintain slashes while reading the quotes
+                //while (iss >> std::quoted(s, '"', (char)0)) {
+                //    filePath << s;
+                //}
+            } else if (arg->Name == L"launchOnExit") {
+                // For if we want to return to a frontend
+                m_launchOnExit = arg->Value;
+            }
+        }
+    }
 }
 
 void SDL_WinRTApp::OnSuspending(Platform::Object ^ sender, SuspendingEventArgs ^ args)

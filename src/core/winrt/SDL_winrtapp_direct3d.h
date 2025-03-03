@@ -34,6 +34,10 @@ ref class SDL_WinRTApp sealed : public Windows::ApplicationModel::Core::IFramewo
     virtual void Run();
     virtual void Uninitialize();
 
+    void SDL_WinRTApp::App_BackRequested(
+        Platform::Object ^ sender,
+        Windows::UI::Core::BackRequestedEventArgs ^ e);
+
     internal :
         // SDL-specific methods
         void
@@ -87,6 +91,7 @@ ref class SDL_WinRTApp sealed : public Windows::ApplicationModel::Core::IFramewo
   private:
     bool m_windowClosed;
     bool m_windowVisible;
+    Platform::String^ m_launchOnExit;
 };
 
 extern SDL_WinRTApp ^ SDL_WinRTGlobalApp;
