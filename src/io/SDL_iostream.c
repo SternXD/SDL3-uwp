@@ -88,7 +88,7 @@ typedef struct IOStreamWindowsData
 
 static HANDLE SDLCALL windows_file_open(const char *filename, const char *mode)
 {
-#if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
+#if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES) && !defined(SDL_PLATFORM_WINRT)
     UINT old_error_mode;
 #endif
     HANDLE h;
@@ -120,13 +120,24 @@ static HANDLE SDLCALL windows_file_open(const char *filename, const char *mode)
     }
     // failed (invalid call)
 
-#if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
+#if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES) && !defined(SDL_PLATFORM_WINRT)
     // Do not open a dialog box if failure
     old_error_mode = SetErrorMode(SEM_NOOPENFILEERRORBOX | SEM_FAILCRITICALERRORS);
 #endif
 
     {
         LPWSTR str = WIN_UTF8ToStringW(filename);
+#if defined(SDL_PLATFORM_WINRT)
+        CREATEFILE2_EXTENDED_PARAMETERS extparams;
+        SDL_zero(extparams);
+        extparams.dwSize = sizeof(extparams);
+        extparams.dwFileAttributes = FILE_ATTRIBUTE_NORMAL;
+        h = CreateFile2(str,
+                        (w_right | r_right),
+                        (w_right) ? 0 : FILE_SHARE_READ,
+                        (must_exist | truncate | a_mode),
+                        &extparams);
+#else
         h = CreateFileW(str,
                        (w_right | r_right),
                        (w_right) ? 0 : FILE_SHARE_READ,
@@ -134,10 +145,11 @@ static HANDLE SDLCALL windows_file_open(const char *filename, const char *mode)
                        (must_exist | truncate | a_mode),
                        FILE_ATTRIBUTE_NORMAL,
                        NULL);
+#endif
         SDL_free(str);
     }
 
-#if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
+#if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES) && !defined(SDL_PLATFORM_WINRT)
     // restore old behavior
     SetErrorMode(old_error_mode);
 #endif
@@ -969,6 +981,25 @@ static bool SDLCALL mem_close(void *userdata)
 #define SKIP_STDIO_DIR_TEST 1
 #endif
 
+#if defined(HAVE_STDIO_H) && !defined(SDL_PLATFORM_WINDOWS)
+static bool IsRegularFileOrPipe(FILE *f)
+{
+#ifdef SDL_PLATFORM_WINRT
+    struct __stat64 st;
+    if (_fstat64(_fileno(f), &st) < 0 ||
+        !((st.st_mode & _S_IFMT) == _S_IFREG || (st.st_mode & _S_IFMT) == _S_IFIFO)) {
+        return false;
+    }
+#elif !defined(SDL_PLATFORM_EMSCRIPTEN)
+    struct stat st;
+    if (fstat(fileno(f), &st) < 0 || !(S_ISREG(st.st_mode) || S_ISFIFO(st.st_mode))) {
+        return false;
+    }
+#endif // !SDL_PLATFORM_EMSCRIPTEN
+    return true;
+}
+#endif
+
 #if defined(HAVE_STDIO_H) && !defined(SKIP_STDIO_DIR_TEST)
 static bool IsStdioFileADirectory(FILE *f)
 {
@@ -1110,7 +1141,10 @@ SDL_IOStream *SDL_IOFromFile(const char *file, const char *mode)
 
 #elif defined(HAVE_STDIO_H)
     {
-        #if defined(SDL_PLATFORM_3DS)
+        #if defined(SDL_PLATFORM_WINRT)
+        FILE *fp = NULL;
+        fopen_s(&fp, file, mode);
+        #elif defined(SDL_PLATFORM_3DS)
         FILE *fp = N3DS_FileOpen(file, mode);
         #else
         FILE *fp = fopen(file, mode);

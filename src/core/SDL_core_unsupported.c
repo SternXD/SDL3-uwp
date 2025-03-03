@@ -103,6 +103,26 @@ void SDL_UnregisterApp(void)
 
 #endif /* !SDL_PLATFORM_WINDOWS */
 
+#ifndef SDL_PLATFORM_WINRT
+
+// Returns SDL_WinRT_DeviceFamily enum
+SDL_DECLSPEC int SDLCALL SDL_GetWinRTDeviceFamily(void);
+int SDL_GetWinRTDeviceFamily(void)
+{
+    SDL_Unsupported();
+    return 0; // SDL_WINRT_DEVICEFAMILY_UNKNOWN
+}
+
+SDL_DECLSPEC const char *SDLCALL SDL_GetWinRTFSPath(int pathType); // SDL_WinRT_Path pathType
+const char *SDL_GetWinRTFSPath(int pathType)
+{
+    (void)pathType;
+    SDL_Unsupported();
+    return NULL;
+}
+
+#endif
+
 #ifndef SDL_PLATFORM_ANDROID
 
 void SDL_SendAndroidBackButton(void)

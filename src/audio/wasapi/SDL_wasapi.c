@@ -49,21 +49,19 @@ typedef HANDLE (WINAPI *pfnAvSetMmThreadCharacteristicsW)(LPCWSTR, LPDWORD);
 typedef BOOL (WINAPI *pfnAvRevertMmThreadCharacteristics)(HANDLE);
 static pfnAvSetMmThreadCharacteristicsW pAvSetMmThreadCharacteristicsW = NULL;
 static pfnAvRevertMmThreadCharacteristics pAvRevertMmThreadCharacteristics = NULL;
-
 // Some GUIDs we need to know without linking to libraries that aren't available before Vista.
 static const IID SDL_IID_IAudioRenderClient = { 0xf294acfc, 0x3146, 0x4483, { 0xa7, 0xbf, 0xad, 0xdc, 0xa7, 0xc2, 0x60, 0xe2 } };
 static const IID SDL_IID_IAudioCaptureClient = { 0xc8adbd64, 0xe71e, 0x48a0, { 0xa4, 0xde, 0x18, 0x5c, 0x39, 0x5c, 0xd3, 0x17 } };
 static const IID SDL_IID_IAudioClient = { 0x1cb9ad4c, 0xdbfa, 0x4c32, { 0xb1, 0x78, 0xc2, 0xf5, 0x68, 0xa7, 0x03, 0xb2 } };
 #ifdef __IAudioClient2_INTERFACE_DEFINED__
 static const IID SDL_IID_IAudioClient2 = { 0x726778cd, 0xf60a, 0x4EDA, { 0x82, 0xde, 0xe4, 0x76, 0x10, 0xcd, 0x78, 0xaa } };
-#endif //
+#endif
 #ifdef __IAudioClient3_INTERFACE_DEFINED__
 static const IID SDL_IID_IAudioClient3 = { 0x7ed4ee07, 0x8e67, 0x4cd4, { 0x8c, 0x1a, 0x2b, 0x7a, 0x59, 0x87, 0xad, 0x42 } };
 #endif //
 
 static bool immdevice_initialized = false;
 static bool supports_recording_on_playback_devices = false;
-
 // WASAPI is _really_ particular about various things happening on the same thread, for COM and such,
 //  so we proxy various stuff to a single background thread to manage.
 
@@ -213,27 +211,15 @@ static void Deinit(void)
 
     WIN_CoUninitialize();
 }
-
 static bool ManagementThreadPrepare(void)
 {
-    const SDL_IMMDevice_callbacks callbacks = { AudioDeviceDisconnected, DefaultAudioDeviceChanged };
-    if (FAILED(WIN_CoInitialize())) {
-        return SDL_SetError("CoInitialize() failed");
-    } else if (!SDL_IMMDevice_Init(&callbacks)) {
-        return false; // Error string is set by SDL_IMMDevice_Init
-    }
-
-    immdevice_initialized = true;
-
-    libavrt = LoadLibrary(TEXT("avrt.dll")); // this library is available in Vista and later. No WinXP, so have to LoadLibrary to use it for now!
-    if (libavrt) {
-        pAvSetMmThreadCharacteristicsW = (pfnAvSetMmThreadCharacteristicsW)GetProcAddress(libavrt, "AvSetMmThreadCharacteristicsW");
-        pAvRevertMmThreadCharacteristics = (pfnAvRevertMmThreadCharacteristics)GetProcAddress(libavrt, "AvRevertMmThreadCharacteristics");
+    if (!WASAPI_PlatformInit()) {
+        return false;
     }
 
     ManagementThreadLock = SDL_CreateMutex();
     if (!ManagementThreadLock) {
-        Deinit();
+        WASAPI_PlatformDeinit();
         return false;
     }
 
@@ -241,7 +227,7 @@ static bool ManagementThreadPrepare(void)
     if (!ManagementThreadCondition) {
         SDL_DestroyMutex(ManagementThreadLock);
         ManagementThreadLock = NULL;
-        Deinit();
+        WASAPI_PlatformDeinit();
         return false;
     }
 
@@ -330,7 +316,7 @@ typedef struct
 static bool mgmtthrtask_DetectDevices(void *userdata)
 {
     mgmtthrtask_DetectDevicesData *data = (mgmtthrtask_DetectDevicesData *)userdata;
-    SDL_IMMDevice_EnumerateEndpoints(data->default_playback, data->default_recording, SDL_AUDIO_F32, supports_recording_on_playback_devices);
+    WASAPI_EnumerateEndpoints(data->default_playback, data->default_recording);
     return true;
 }
 
@@ -391,6 +377,12 @@ static bool mgmtthrtask_CoTaskMemFree(void *userdata)
     return true;
 }
 
+static bool mgmtthrtask_PlatformDeleteActivationHandler(void *userdata)
+{
+    WASAPI_PlatformDeleteActivationHandler(userdata);
+    return true;
+}
+
 static bool mgmtthrtask_CloseHandle(void *userdata)
 {
     CloseHandle((HANDLE) userdata);
@@ -430,6 +422,12 @@ static void ResetWasapiDevice(SDL_AudioDevice *device)
         WASAPI_ProxyToManagementThread(mgmtthrtask_CoTaskMemFree, ptr, NULL);
     }
 
+    if (device->hidden->activation_handler) {
+        void *activation_handler = device->hidden->activation_handler;
+        device->hidden->activation_handler = NULL;
+        WASAPI_ProxyToManagementThread(mgmtthrtask_PlatformDeleteActivationHandler, activation_handler, NULL);
+    }
+
     if (device->hidden->event) {
         HANDLE event = device->hidden->event;
         device->hidden->event = NULL;
@@ -439,31 +437,7 @@ static void ResetWasapiDevice(SDL_AudioDevice *device)
 
 static bool mgmtthrtask_ActivateDevice(void *userdata)
 {
-    SDL_AudioDevice *device = (SDL_AudioDevice *) userdata;
-
-    IMMDevice *immdevice = NULL;
-    if (!SDL_IMMDevice_Get(device, &immdevice, device->recording)) {
-        device->hidden->client = NULL;
-        return false; // This is already set by SDL_IMMDevice_Get
-    }
-
-    device->hidden->isplayback = !SDL_IMMDevice_GetIsCapture(immdevice);
-
-    // this is _not_ async in standard win32, yay!
-    HRESULT ret = IMMDevice_Activate(immdevice, &SDL_IID_IAudioClient, CLSCTX_ALL, NULL, (void **)&device->hidden->client);
-    IMMDevice_Release(immdevice);
-
-    if (FAILED(ret)) {
-        SDL_assert(device->hidden->client == NULL);
-        return WIN_SetErrorFromHRESULT("WASAPI can't activate audio endpoint", ret);
-    }
-
-    SDL_assert(device->hidden->client != NULL);
-    if (!WASAPI_PrepDevice(device)) { // not async, fire it right away.
-        return false;
-    }
-
-    return true; // good to go.
+    return WASAPI_ActivateDevice((SDL_AudioDevice *)userdata);
 }
 
 static bool ActivateWasapiDevice(SDL_AudioDevice *device)
@@ -906,37 +880,17 @@ static bool WASAPI_OpenDevice(SDL_AudioDevice *device)
 
 static void WASAPI_ThreadInit(SDL_AudioDevice *device)
 {
-    // this thread uses COM.
-    if (SUCCEEDED(WIN_CoInitialize())) { // can't report errors, hope it worked!
-        device->hidden->coinitialized = true;
-    }
-
-    // Set this thread to very high "Pro Audio" priority.
-    if (pAvSetMmThreadCharacteristicsW) {
-        DWORD idx = 0;
-        device->hidden->task = pAvSetMmThreadCharacteristicsW(L"Pro Audio", &idx);
-    } else {
-        SDL_SetCurrentThreadPriority(device->recording ? SDL_THREAD_PRIORITY_HIGH : SDL_THREAD_PRIORITY_TIME_CRITICAL);
-    }
+    WASAPI_PlatformThreadInit(device);
 }
 
 static void WASAPI_ThreadDeinit(SDL_AudioDevice *device)
 {
-    // Set this thread back to normal priority.
-    if (device->hidden->task && pAvRevertMmThreadCharacteristics) {
-        pAvRevertMmThreadCharacteristics(device->hidden->task);
-        device->hidden->task = NULL;
-    }
-
-    if (device->hidden->coinitialized) {
-        WIN_CoUninitialize();
-        device->hidden->coinitialized = false;
-    }
+    WASAPI_PlatformThreadDeinit(device);
 }
 
 static bool mgmtthrtask_FreeDeviceHandle(void *userdata)
 {
-    SDL_IMMDevice_FreeDeviceHandle((SDL_AudioDevice *) userdata);
+    WASAPI_PlatformFreeDeviceHandle((SDL_AudioDevice *) userdata);
     return true;
 }
 
@@ -948,7 +902,7 @@ static void WASAPI_FreeDeviceHandle(SDL_AudioDevice *device)
 
 static bool mgmtthrtask_DeinitializeStart(void *userdata)
 {
-    StopWasapiHotplug();
+    WASAPI_PlatformDeinitializeStart();
     return true;
 }
 

@@ -849,9 +849,6 @@ The following hints have been removed:
 * SDL_HINT_WINDOWS_DISABLE_THREAD_NAMING - SDL now properly handles the 0x406D1388 Exception if no debugger intercepts it, preventing its propagation.
 * SDL_HINT_WINDOWS_FORCE_MUTEX_CRITICAL_SECTIONS - Slim Reader/Writer Locks are always used if available
 * SDL_HINT_WINDOWS_NO_CLOSE_ON_ALT_F4 - replaced with SDL_HINT_WINDOWS_CLOSE_ON_ALT_F4, defaulting to true
-* SDL_HINT_WINRT_HANDLE_BACK_BUTTON - WinRT support was removed in SDL3.
-* SDL_HINT_WINRT_PRIVACY_POLICY_LABEL - WinRT support was removed in SDL3.
-* SDL_HINT_WINRT_PRIVACY_POLICY_URL - WinRT support was removed in SDL3.
 * SDL_HINT_XINPUT_USE_OLD_JOYSTICK_MAPPING
 
 The following environment variables have been renamed:
@@ -1146,13 +1143,10 @@ Using it is really simple: Just `#include <SDL3/SDL_main.h>` in the source file 
 Several platform-specific entry point functions have been removed as unnecessary. If for some reason you explicitly need them, here are easy replacements:
 
 ```c
+#define SDL_WinRTRunApp(MAIN_FUNC, RESERVED)  SDL_RunApp(0, NULL, MAIN_FUNC, RESERVED)
 #define SDL_UIKitRunApp(ARGC, ARGV, MAIN_FUNC)  SDL_RunApp(ARGC, ARGV, MAIN_FUNC, NULL)
 #define SDL_GDKRunApp(MAIN_FUNC, RESERVED)  SDL_RunApp(0, NULL, MAIN_FUNC, RESERVED)
 ```
-
-The following functions have been removed:
-* SDL_WinRTRunApp() - WinRT support was removed in SDL3.
-
 
 ## SDL_messagebox.h
 
@@ -1323,8 +1317,6 @@ The following platform preprocessor macros have been removed:
 * `__NACL__`
 * `__PNACL__`
 * `__WINDOWS__`
-* `__WINRT__`
-
 
 ## SDL_quit.h
 
@@ -1899,12 +1891,9 @@ SDL_iPhoneSetAnimationCallback() and SDL_iPhoneSetEventPump() have been renamed 
 SDL_IsAndroidTV() has been renamed SDL_IsTV() and is no longer Android-specific; an app running on an Apple TV device will also return true, for example.
 
 The following functions have been removed:
-* SDL_GetWinRTFSPathUNICODE() - WinRT support was removed in SDL3.
-* SDL_GetWinRTFSPathUTF8() - WinRT support was removed in SDL3.
 * SDL_RenderGetD3D11Device() - replaced with the "SDL.renderer.d3d11.device" property
 * SDL_RenderGetD3D12Device() - replaced with the "SDL.renderer.d3d12.device" property
 * SDL_RenderGetD3D9Device() - replaced with the "SDL.renderer.d3d9.device" property
-* SDL_WinRTGetDeviceFamily() - WinRT support was removed in SDL3.
 
 The following functions have been renamed:
 * SDL_AndroidBackButton() => SDL_SendAndroidBackButton()

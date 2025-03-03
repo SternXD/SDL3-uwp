@@ -98,6 +98,7 @@ class JobSpec:
     msvc_project: Optional[str] = None
     msvc_arch: Optional[MsvcArch] = None
     clang_cl: bool = False
+    uwp: bool = False
     gdk: bool = False
     vita_gles: Optional[VitaGLES] = None
     more_hard_deps: bool = False
@@ -112,7 +113,8 @@ JOB_SPECS = {
     "msvc-x86": JobSpec(name="Windows (MSVC, x86)",                         os=JobOs.WindowsLatest,     platform=SdlPlatform.Msvc,        artifact="SDL-VC-x86",             msvc_arch=MsvcArch.X86,   msvc_project="VisualC/SDL.sln", ),
     "msvc-clang-x64": JobSpec(name="Windows (MSVC, clang-cl x64)",          os=JobOs.WindowsLatest,     platform=SdlPlatform.Msvc,        artifact="SDL-clang-cl-x64",       msvc_arch=MsvcArch.X64,   clang_cl=True, ),
     "msvc-clang-x86": JobSpec(name="Windows (MSVC, clang-cl x86)",          os=JobOs.WindowsLatest,     platform=SdlPlatform.Msvc,        artifact="SDL-clang-cl-x86",       msvc_arch=MsvcArch.X86,   clang_cl=True, ),
-    "msvc-arm64": JobSpec(name="Windows (MSVC, ARM64)",                     os=JobOs.WindowsLatest,     platform=SdlPlatform.Msvc,        artifact="SDL-VC-arm64",           msvc_arch=MsvcArch.Arm64, msvc_project="VisualC/SDL.sln", ),
+    "msvc-arm64": JobSpec(name="Windows (MSVC, ARM64)",                     os=JobOs.WindowsLatest,     platform=SdlPlatform.Msvc,        artifact="SDL-VC-arm64",           msvc_arch=MsvcArch.Arm64, ),
+    "msvc-uwp-x64": JobSpec(name="UWP (MSVC, x64)",                         os=JobOs.WindowsLatest,     platform=SdlPlatform.Msvc,        artifact="SDL-VC-UWP",             msvc_arch=MsvcArch.X64,   msvc_project="VisualC-WinRT/SDL-UWP.sln", uwp=True, ),
     "msvc-gdk-x64": JobSpec(name="GDK (MSVC, x64)",                         os=JobOs.WindowsLatest,     platform=SdlPlatform.Msvc,        artifact="SDL-VC-GDK",             msvc_arch=MsvcArch.X64,   msvc_project="VisualC-GDK/SDL.sln", gdk=True, no_cmake=True, ),
     "ubuntu-22.04": JobSpec(name="Ubuntu 22.04",                            os=JobOs.Ubuntu22_04,       platform=SdlPlatform.Linux,       artifact="SDL-ubuntu22.04", ),
     "ubuntu-latest": JobSpec(name="Ubuntu (latest)",                        os=JobOs.UbuntuLatest,      platform=SdlPlatform.Linux,       artifact="SDL-ubuntu-latest", ),
@@ -387,7 +389,10 @@ def spec_to_job(spec: JobSpec, key: str, trackmem_symbol_names: bool) -> JobDeta
                 "-DCMAKE_SHARED_LINKER_FLAGS=-DEBUG",
             ))
 
-            job.cmake_arguments.append("'-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>'")
+            if spec.uwp:
+                job.cmake_arguments.append("'-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>DLL'")
+            else:
+                job.cmake_arguments.append("'-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>'")
 
             if spec.clang_cl:
                 job.cmake_arguments.extend((
@@ -426,7 +431,14 @@ def spec_to_job(spec: JobSpec, key: str, trackmem_symbol_names: bool) -> JobDeta
                 case MsvcArch.Arm64:
                     job.msvc_vcvars_arch = "x64_arm64"
                     job.run_tests = False
-            if spec.gdk:
+            if spec.uwp:
+                job.build_tests = False
+                job.cmake_arguments.extend((
+                    "-DCMAKE_SYSTEM_NAME=WindowsStore",
+                    "-DCMAKE_SYSTEM_VERSION=10.0",
+                ))
+                job.msvc_project_flags.append("-p:WindowsTargetPlatformVersion=10.0.17763.0")
+            elif spec.gdk:
                 job.setup_gdk_folder = "VisualC-GDK"
             else:
                 match spec.msvc_arch:

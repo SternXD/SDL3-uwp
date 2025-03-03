@@ -85,6 +85,9 @@ bool SDL_GetCurrentTime(SDL_Time *ticks)
 
     SDL_zero(ft);
 
+#ifdef SDL_PLATFORM_WINRT
+    GetSystemTimePreciseAsFileTime(&ft);
+#else
     static pfnGetSystemTimePreciseAsFileTime pGetSystemTimePreciseAsFileTime = NULL;
     static bool load_attempted = false;
 
@@ -102,6 +105,7 @@ bool SDL_GetCurrentTime(SDL_Time *ticks)
     } else {
         GetSystemTimeAsFileTime(&ft);
     }
+#endif
 
     *ticks = SDL_TimeFromWindows(ft.dwLowDateTime, ft.dwHighDateTime);
 

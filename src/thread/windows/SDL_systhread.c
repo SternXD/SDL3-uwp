@@ -114,6 +114,7 @@ void SDL_SYS_SetupThread(const char *name)
 {
     if (name) {
         PVOID exceptionHandlerHandle;
+#ifndef SDL_PLATFORM_WINRT // !!! FIXME: There's no LoadLibrary() in WinRT; don't know if SetThreadDescription is available there at all at the moment.
         static pfnSetThreadDescription pSetThreadDescription = NULL;
         static HMODULE kernel32 = NULL;
 
@@ -137,6 +138,7 @@ void SDL_SYS_SetupThread(const char *name)
                 SDL_free(strw);
             }
         }
+#endif
 
         /* Presumably some version of Visual Studio will understand SetThreadDescription(),
            but we still need to deal with older OSes and debuggers. Set it with the arcane
