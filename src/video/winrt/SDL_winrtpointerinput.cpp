@@ -220,7 +220,7 @@ void WINRT_ProcessPointerPressedEvent(SDL_Window *window, Windows::UI::Input::Po
         Uint8 button, pressed;
         WINRT_GetSDLButtonForPointerPoint(pointerPoint, &button, &pressed);
         SDL_assert(pressed == 1);
-        SDL_SendMouseButton(0, window, SDL_DEFAULT_MOUSE_ID, SDL_PRESSED, button);
+        SDL_SendMouseButton(0, window, SDL_DEFAULT_MOUSE_ID, 0, button);
     } else {
         Windows::Foundation::Point normalizedPoint = WINRT_TransformCursorPosition(window, pointerPoint->Position, NormalizeZeroToOne);
         Windows::Foundation::Point windowPoint = WINRT_TransformCursorPosition(window, pointerPoint->Position, TransformToSDLWindowSize);
@@ -274,7 +274,7 @@ void WINRT_ProcessPointerReleasedEvent(SDL_Window *window, Windows::UI::Input::P
         Uint8 button, pressed;
         WINRT_GetSDLButtonForPointerPoint(pointerPoint, &button, &pressed);
         SDL_assert(pressed == 0);
-        SDL_SendMouseButton(0, window, SDL_DEFAULT_MOUSE_ID, SDL_RELEASED, button);
+        SDL_SendMouseButton(0, window, SDL_DEFAULT_MOUSE_ID, 1, button);
     } else {
         Windows::Foundation::Point normalizedPoint = WINRT_TransformCursorPosition(window, pointerPoint->Position, NormalizeZeroToOne);
 
