@@ -256,4 +256,11 @@ char *SDL_SYS_GetUserFolder(SDL_Folder folder)
     return WIN_StringToUTF8W(wpath.c_str());
 }
 
+// TODO
+char *SDL_SYS_GetCurrentDirectory(void)
+{
+    SDL_Unsupported();
+    return NULL;
+}
+
 #endif // SDL_PLATFORM_WINRT
