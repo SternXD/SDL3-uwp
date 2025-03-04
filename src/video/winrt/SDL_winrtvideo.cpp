@@ -159,7 +159,7 @@ static SDL_VideoDevice *WINRT_CreateDevice(void)
     device->GL_SetSwapInterval = WIN_GL_SetSwapInterval;
     device->GL_GetSwapInterval = WIN_GL_GetSwapInterval;
     device->GL_SwapWindow = WIN_GL_SwapWindow;
-    device->GL_DeleteContext = WIN_GL_DeleteContext;
+    device->GL_DestroyContext = WIN_GL_DestroyContext;
 #endif
     device->free = WINRT_DeleteDevice;
 
@@ -259,13 +259,13 @@ bool WINRT_VideoInit(SDL_VideoDevice *_this)
 }
 
 #ifdef SDL_VIDEO_OPENGL_WGL
-Uint32 D3D11_DXGIFormatToSDLPixelFormat(DXGI_FORMAT dxgiFormat)
+SDL_PixelFormat D3D11_DXGIFormatToSDLPixelFormat(DXGI_FORMAT dxgiFormat)
 {
     switch (dxgiFormat) {
     case DXGI_FORMAT_B8G8R8A8_UNORM:
         return SDL_PIXELFORMAT_ARGB8888;
     case DXGI_FORMAT_B8G8R8X8_UNORM:
-        return SDL_PIXELFORMAT_RGB888;
+        return SDL_PIXELFORMAT_XRGB8888;
     default:
         return SDL_PIXELFORMAT_UNKNOWN;
     }
