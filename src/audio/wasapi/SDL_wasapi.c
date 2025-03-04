@@ -253,7 +253,7 @@ static int ManagementThreadEntry(void *userdata)
     SDL_SignalSemaphore(data->ready_sem); // unblock calling thread.
     ManagementThreadMainloop();
 
-    Deinit();
+    WASAPI_PlatformDeinit();
     return 0;
 }
 
