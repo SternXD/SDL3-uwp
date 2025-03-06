@@ -1764,7 +1764,9 @@ static bool GL_CreateRenderer(SDL_Renderer *renderer, SDL_Window *window, SDL_Pr
 {
     GL_RenderData *data = NULL;
     GLint value;
+#if !defined SDL_VIDEO_VITA_PVR_OGL && !defined SDL_PLATFORM_WINRT
     SDL_WindowFlags window_flags = 0;
+#endif
     int profile_mask = 0, major = 0, minor = 0;
     int real_major = 0, real_minor = 0;
     bool changed_window = false;
