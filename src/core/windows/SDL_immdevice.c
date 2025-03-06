@@ -19,6 +19,7 @@
   3. This notice may not be removed or altered from any source distribution.
 */
 #include "SDL_internal.h"
+#include <mmdeviceapi.h> // For ERole (includes are weird here, SDL_immdevice.h has this exact include but it still isnt defined?)
 
 #if defined(SDL_PLATFORM_WINDOWS) && defined(HAVE_MMDEVICEAPI_H)
 
