@@ -140,7 +140,7 @@
       <AdditionalIncludeDirectories>$(ProjectDir);$(IntermediateOutputPath);..\..\include</AdditionalIncludeDirectories>
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4453;28204</DisableSpecificWarnings>
-      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;SDL_PLATFORM_WINRT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <CompileAsWinRT>false</CompileAsWinRT>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
@@ -157,7 +157,7 @@
       <AdditionalIncludeDirectories>$(ProjectDir);$(IntermediateOutputPath);..\..\include</AdditionalIncludeDirectories>
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4453;28204</DisableSpecificWarnings>
-      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;SDL_PLATFORM_WINRT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <CompileAsWinRT>false</CompileAsWinRT>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
@@ -174,7 +174,7 @@
       <AdditionalIncludeDirectories>$(ProjectDir);$(IntermediateOutputPath);..\..\include</AdditionalIncludeDirectories>
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4453;28204</DisableSpecificWarnings>
-      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;SDL_PLATFORM_WINRT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <CompileAsWinRT>false</CompileAsWinRT>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
@@ -191,7 +191,7 @@
       <AdditionalIncludeDirectories>$(ProjectDir);$(IntermediateOutputPath);..\..\include</AdditionalIncludeDirectories>
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4453;28204</DisableSpecificWarnings>
-      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;SDL_PLATFORM_WINRT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <CompileAsWinRT>false</CompileAsWinRT>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
@@ -208,7 +208,7 @@
       <AdditionalIncludeDirectories>$(ProjectDir);$(IntermediateOutputPath);..\..\include</AdditionalIncludeDirectories>
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4453;28204</DisableSpecificWarnings>
-      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;SDL_PLATFORM_WINRT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <CompileAsWinRT>false</CompileAsWinRT>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
@@ -225,7 +225,7 @@
       <AdditionalIncludeDirectories>$(ProjectDir);$(IntermediateOutputPath);..\..\include</AdditionalIncludeDirectories>
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4453;28204</DisableSpecificWarnings>
-      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;SDL_PLATFORM_WINRT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <CompileAsWinRT>false</CompileAsWinRT>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
@@ -242,7 +242,7 @@
       <AdditionalIncludeDirectories>$(ProjectDir);$(IntermediateOutputPath);..\..\include</AdditionalIncludeDirectories>
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4453;28204</DisableSpecificWarnings>
-      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;SDL_PLATFORM_WINRT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <CompileAsWinRT>false</CompileAsWinRT>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
@@ -259,7 +259,7 @@
       <AdditionalIncludeDirectories>$(ProjectDir);$(IntermediateOutputPath);..\..\include</AdditionalIncludeDirectories>
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4453;28204</DisableSpecificWarnings>
-      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;SDL_PLATFORM_WINRT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <CompileAsWinRT>false</CompileAsWinRT>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
@@ -310,6 +310,24 @@
       <CompileAsWinRT Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</CompileAsWinRT>
     </ClCompile>
     <ClCompile Include="..\..\test\testdraw.c">
+      <CompileAsWinRT Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</CompileAsWinRT>
+      <CompileAsWinRT Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</CompileAsWinRT>
+      <CompileAsWinRT Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">false</CompileAsWinRT>
+      <CompileAsWinRT Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">false</CompileAsWinRT>
+      <CompileAsWinRT Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">false</CompileAsWinRT>
+      <CompileAsWinRT Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">false</CompileAsWinRT>
+      <CompileAsWinRT Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</CompileAsWinRT>
+      <CompileAsWinRT Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</CompileAsWinRT>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\..\test\testdraw_winrt.c">
       <CompileAsWinRT Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</CompileAsWinRT>
       <CompileAsWinRT Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</CompileAsWinRT>
       <CompileAsWinRT Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">false</CompileAsWinRT>
