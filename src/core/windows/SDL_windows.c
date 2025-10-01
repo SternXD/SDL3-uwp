@@ -92,6 +92,7 @@ static const TCHAR *SDL_HelperWindowClassName = TEXT("SDLHelperWindowInputCatche
 static const TCHAR *SDL_HelperWindowName = TEXT("SDLHelperWindowInputMsgWindow");
 static ATOM SDL_HelperWindowClass = 0;
 
+#if !defined(SDL_PLATFORM_WINRT) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
 /*
  * Creates a HelperWindow used for DirectInput.
  */
@@ -157,10 +158,9 @@ void SDL_HelperWindowDestroy(void)
         SDL_HelperWindowClass = 0;
     }
 }
-#else
-// Stub implementations for UWP/Xbox platforms
-HWND SDL_HelperWindow = NULL;
+#endif
 
+// Stub implementations for UWP/Xbox platforms
 bool SDL_HelperWindowCreate(void)
 {
     return true; // No-op for UWP/Xbox
@@ -170,7 +170,6 @@ void SDL_HelperWindowDestroy(void)
 {
     // No-op for UWP/Xbox
 }
-#endif
 
 // Sets an error message based on an HRESULT
 bool WIN_SetErrorFromHRESULT(const char *prefix, HRESULT hr)

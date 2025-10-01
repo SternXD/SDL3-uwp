@@ -519,10 +519,13 @@ static HRESULT D3D11_CreateDeviceResources(SDL_Renderer *renderer)
 {
     typedef HRESULT (WINAPI *pfnCreateDXGIFactory)(REFIID riid, void **ppFactory);
     typedef HRESULT (WINAPI *pfnCreateDXGIFactory2)(UINT flags, REFIID riid, void **ppFactory);
+    typedef HRESULT (WINAPI *PFN_D3D11_CREATE_DEVICE)(IDXGIAdapter *, D3D_DRIVER_TYPE, HMODULE, UINT, const D3D_FEATURE_LEVEL *, UINT, UINT, ID3D11Device **, D3D_FEATURE_LEVEL *, ID3D11DeviceContext **);
     pfnCreateDXGIFactory pCreateDXGIFactory = NULL;
     pfnCreateDXGIFactory2 pCreateDXGIFactory2 = NULL;
     D3D11_RenderData *data = (D3D11_RenderData *)renderer->internal;
     PFN_D3D11_CREATE_DEVICE pD3D11CreateDevice;
+    pfnCreateDXGIFactory2 CreateDXGIFactory2Func = NULL;
+    PFN_D3D11_CREATE_DEVICE D3D11CreateDeviceFunc = NULL;
     IDXGIAdapter *dxgiAdapter = NULL;
     ID3D11Device *d3dDevice = NULL;
     ID3D11DeviceContext *d3dContext = NULL;
@@ -554,13 +557,15 @@ static HRESULT D3D11_CreateDeviceResources(SDL_Renderer *renderer)
 #ifdef SDL_PLATFORM_WINRT
     CreateDXGIFactory2Func = CreateDXGIFactory2;
     D3D11CreateDeviceFunc = D3D11CreateDevice;
+    // For WinRT, we use the direct function pointers
+    pCreateDXGIFactory2 = CreateDXGIFactory2Func;
+    pD3D11CreateDevice = D3D11CreateDeviceFunc;
 #else
     data->hDXGIMod = SDL_LoadObject("dxgi.dll");
     if (!data->hDXGIMod) {
         result = E_FAIL;
         goto done;
     }
-#endif // SDL_PLATFORM_WINRT
 
     pCreateDXGIFactory2 = (pfnCreateDXGIFactory2)SDL_LoadFunction(data->hDXGIMod, "CreateDXGIFactory2");
     if (!pCreateDXGIFactory2) {
@@ -582,6 +587,7 @@ static HRESULT D3D11_CreateDeviceResources(SDL_Renderer *renderer)
         result = E_FAIL;
         goto done;
     }
+#endif // SDL_PLATFORM_WINRT
 
     if (createDebug) {
 #ifdef __IDXGIInfoQueue_INTERFACE_DEFINED__
@@ -945,6 +951,7 @@ static HRESULT D3D11_CreateSwapChain(SDL_Renderer *renderer, int w, int h)
         goto done;
 #endif
     } else {
+        // Desktop Windows case
 #if defined(SDL_PLATFORM_WIN32) || defined(SDL_PLATFORM_WINGDK)
         HWND hwnd = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(renderer->window), SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
         if (!hwnd) {
@@ -969,7 +976,7 @@ static HRESULT D3D11_CreateSwapChain(SDL_Renderer *renderer, int w, int h)
 #else
         SDL_SetError(SDL_FUNCTION ", Unable to find something to attach a swap chain to");
         goto done;
-#endif // defined(SDL_PLATFORM_WIN32) || defined(SDL_PLATFORM_WINGDK) / else
+#endif // defined(SDL_PLATFORM_WIN32) || defined(SDL_PLATFORM_WINGDK)
     }
     data->swapEffect = swapChainDesc.SwapEffect;
 
@@ -1106,7 +1113,7 @@ static HRESULT D3D11_CreateWindowSizeDependentResources(SDL_Renderer *renderer)
      *
      * TODO, WinRT: reexamine the docs for IDXGISwapChain1::SetRotation, see if might be available, usable, and prudent-to-call on WinPhone 8.1
      */
-#endif
+
     if (WIN_IsWindows8OrGreater()) {
         if (data->swapEffect == DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL) {
             result = IDXGISwapChain1_SetRotation(data->swapChain, data->rotation);
@@ -1116,7 +1123,6 @@ static HRESULT D3D11_CreateWindowSizeDependentResources(SDL_Renderer *renderer)
             }
         }
     }
-#endif
 
     result = IDXGISwapChain_GetBuffer(data->swapChain,
                                       0,
@@ -1151,6 +1157,7 @@ static HRESULT D3D11_CreateWindowSizeDependentResources(SDL_Renderer *renderer)
 done:
     SAFE_RELEASE(backBuffer);
     return result;
+#endif // !SDL_WINAPI_FAMILY_PHONE
 }
 
 static bool D3D11_HandleDeviceLost(SDL_Renderer *renderer)
