@@ -2466,8 +2466,11 @@ endif()
   endif()
 
   if(SDL_TRAY)
-    sdl_glob_sources("${SDL3_SOURCE_DIR}/src/tray/windows/*.c")
-    set(HAVE_SDL_TRAY TRUE)
+    if(NOT WINDOWS_STORE)
+      sdl_glob_sources("${SDL3_SOURCE_DIR}/src/tray/windows/*.c")
+      set(HAVE_SDL_TRAY TRUE)
+    endif()
+  endif()
   endif()
 
   if(SDL_HIDAPI)

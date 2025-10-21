@@ -901,18 +901,19 @@ static bool IsRegularFileOrPipe(FILE *f)
 
 #if defined(HAVE_STDIO_H) && !defined(SKIP_STDIO_DIR_TEST)
 static bool IsStdioFileADirectory(FILE *f)
-#endif
 {
 #ifndef SDL_PLATFORM_EMSCRIPTEN
     struct stat st;
-    if (fstat(fileno(f), &st) < 0 || !(S_ISREG(st.st_mode) || S_ISFIFO(st.st_mode))) {
+    if (fstat(fileno(f), &st) < 0) {
         return false;
     }
-#endif // !SDL_PLATFORM_EMSCRIPTEN
-
-    return true;
+    return S_ISDIR(st.st_mode);
+#else
+    (void)f;
+    return false;
+#endif // SDL_PLATFORM_EMSCRIPTEN
 }
-#endif
+#endif // HAVE_STDIO_H && !SKIP_STDIO_DIR_TEST
 
 SDL_IOStream *SDL_IOFromFile(const char *file, const char *mode)
 {

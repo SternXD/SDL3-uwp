@@ -678,9 +678,11 @@ static void RAWINPUT_InitWindowsGamingInput(RAWINPUT_DeviceContext *ctx)
         static const IID SDL_IID_IGamepadStatics = { 0x8BBCE529, 0xD49C, 0x39E9, { 0x95, 0x60, 0xE4, 0x7D, 0xDE, 0x96, 0xB7, 0xC8 } };
         HRESULT hr;
 
+#if !defined(SDL_PLATFORM_WINRT)
         if (FAILED(WIN_RoInitialize())) {
             return;
         }
+#endif // SDL_PLATFORM_WINRT
         wgi_state.initialized = true;
         wgi_state.dirty = true;
 
@@ -799,7 +801,9 @@ static void RAWINPUT_QuitWindowsGamingInput(RAWINPUT_DeviceContext *ctx)
             __x_ABI_CWindows_CGaming_CInput_CIGamepadStatics_Release(wgi_state.gamepad_statics);
             wgi_state.gamepad_statics = NULL;
         }
+#if !defined(SDL_PLATFORM_WINRT)
         WIN_RoUninitialize();
+#endif // SDL_PLATFORM_WINRT
         wgi_state.initialized = false;
     }
 }
