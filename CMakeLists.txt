@@ -2165,14 +2165,6 @@ elseif(WINDOWS)
     #include <windows.h>
     int main(int argc, char **argv) { return 0; }" HAVE_WIN32_CC)
 
-  sdl_glob_sources(
-    "${SDL3_SOURCE_DIR}/src/core/windows/*.c"
-    "${SDL3_SOURCE_DIR}/src/core/windows/*.cpp"
-    "${SDL3_SOURCE_DIR}/src/core/windows/*.h"
-  )
-  sdl_glob_sources("${SDL3_SOURCE_DIR}/src/main/windows/*.c")
-  sdl_glob_sources("${SDL3_SOURCE_DIR}/src/io/windows/*.c")
-
   if(WINDOWS_STORE)
     enable_language(CXX)
     sdl_glob_sources(
@@ -2180,6 +2172,18 @@ elseif(WINDOWS)
       "${SDL3_SOURCE_DIR}/src/core/winrt/*.cpp"
       "${SDL3_SOURCE_DIR}/src/main/winrt/*.cpp"
     )
+    sdl_sources(
+      "${SDL3_SOURCE_DIR}/src/core/windows/SDL_windows.c"
+      "${SDL3_SOURCE_DIR}/src/core/windows/SDL_windows.h"
+    )
+  else()
+    sdl_glob_sources(
+      "${SDL3_SOURCE_DIR}/src/core/windows/*.c"
+      "${SDL3_SOURCE_DIR}/src/core/windows/*.cpp"
+      "${SDL3_SOURCE_DIR}/src/core/windows/*.h"
+    )
+    sdl_glob_sources("${SDL3_SOURCE_DIR}/src/main/windows/*.c")
+    sdl_glob_sources("${SDL3_SOURCE_DIR}/src/io/windows/*.c")
   endif()
 
   if(TARGET SDL3-shared AND MSVC AND NOT SDL_LIBC)
@@ -2432,13 +2436,17 @@ endif()
   set(HAVE_SDL_TIMERS TRUE)
 
   set(SDL_LOADSO_WINDOWS 1)
-  sdl_glob_sources("${SDL3_SOURCE_DIR}/src/loadso/windows/*.c")
-  set(HAVE_SDL_LOADSO TRUE)
+  if(NOT WINDOWS_STORE)
+    sdl_glob_sources("${SDL3_SOURCE_DIR}/src/loadso/windows/*.c")
+    set(HAVE_SDL_LOADSO TRUE)
+  endif()
 
-  sdl_glob_sources(
-    "${SDL3_SOURCE_DIR}/src/core/windows/*.c"
-    "${SDL3_SOURCE_DIR}/src/core/windows/*.h"
-  )
+  if(NOT WINDOWS_STORE)
+    sdl_glob_sources(
+      "${SDL3_SOURCE_DIR}/src/core/windows/*.c"
+      "${SDL3_SOURCE_DIR}/src/core/windows/*.h"
+    )
+  endif()
 
   if(SDL_VIDEO)
     if(SDL_OPENGL)
@@ -2471,7 +2479,6 @@ endif()
       set(HAVE_SDL_TRAY TRUE)
     endif()
   endif()
-  endif()
 
   if(SDL_HIDAPI)
     CheckHIDAPI()
@@ -2499,7 +2506,7 @@ endif()
     if(HAVE_WINDOWS_GAMING_INPUT_H)
       set(SDL_JOYSTICK_WGI 1)
     endif()
-    if(HAVE_GAMEINPUT_H)
+    if(HAVE_GAMEINPUT_H AND NOT WINDOWS_STORE)
       sdl_glob_sources("${SDL3_SOURCE_DIR}/src/joystick/gdk/*.cpp")
       set(SDL_JOYSTICK_GAMEINPUT 1)
     endif()
@@ -2508,7 +2515,6 @@ endif()
     if(SDL_HAPTIC)
       if(HAVE_DINPUT_H AND NOT WINDOWS_STORE)
         sdl_glob_sources("${SDL3_SOURCE_DIR}/src/haptic/windows/*.c")
-      endif()
         set(SDL_HAPTIC_DINPUT 1)
         set(HAVE_SDL_HAPTIC TRUE)
       endif()
@@ -3507,7 +3513,7 @@ if(UNIX AND NOT APPLE AND NOT RISCOS AND NOT HAIKU)
 endif()
 
 sdl_sources("${SDL3_SOURCE_DIR}/src/process/SDL_process.c")
-if(WINDOWS)
+if(WINDOWS AND NOT WINDOWS_STORE)
   sdl_glob_sources(
     "${SDL3_SOURCE_DIR}/src/process/windows/*.c"
     "${SDL3_SOURCE_DIR}/src/process/windows/*.h"
@@ -3588,10 +3594,6 @@ if(SDL_GPU AND NOT WINDOWS_STORE)
   endif()
   if(WINDOWS)
     sdl_glob_sources("${SDL3_SOURCE_DIR}/src/gpu/d3d12/*.c")
-    set(SDL_GPU_D3D12 1)
-    set(HAVE_SDL_GPU TRUE)
-  endif()
-endif()
     set(SDL_GPU_D3D12 1)
     set(HAVE_SDL_GPU TRUE)
   endif()

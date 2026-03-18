@@ -513,7 +513,7 @@ bool WIN_WindowRectValid(const RECT *rect)
 
 void WIN_UpdateDarkModeForHWND(HWND hwnd)
 {
-#if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
+#if !defined(SDL_PLATFORM_WINRT) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
     if (!IsWindowsBuildVersionAtLeast(17763)) {
         // Too old to support dark mode
         return;
@@ -567,7 +567,7 @@ void WIN_UpdateDarkModeForHWND(HWND hwnd)
 
 HICON WIN_CreateIconFromSurface(SDL_Surface *surface)
 {
-#if !(defined(SDL_PLATFORM_XBOXONE) || defined(SDL_PLATFORM_XBOXSERIES))
+#if !(defined(SDL_PLATFORM_WINRT) || defined(SDL_PLATFORM_XBOXONE) || defined(SDL_PLATFORM_XBOXSERIES))
     SDL_Surface *s = SDL_ConvertSurface(surface, SDL_PIXELFORMAT_ARGB8888);
     if (!s) {
         return NULL;
