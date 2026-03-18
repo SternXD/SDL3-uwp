@@ -601,6 +601,7 @@ static bool WGI_JoystickInit(void)
     wgi.WindowsCreateStringReference = WindowsCreateStringReference;
     wgi.WindowsDeleteString = WindowsDeleteString;
     wgi.WindowsGetStringRawBuffer = WindowsGetStringRawBuffer;
+#define RESOLVE(x) (void)0
 #else
 #define RESOLVE(x) wgi.x = (x##_t)WIN_LoadComBaseFunction(#x); if (!wgi.x) return WIN_SetError("GetProcAddress failed for " #x);
 #endif
@@ -610,7 +611,6 @@ static bool WGI_JoystickInit(void)
     RESOLVE(WindowsDeleteString);
     RESOLVE(WindowsGetStringRawBuffer);
 #undef RESOLVE
-#endif // SDL_PLATFORM_WINRT
 
 #ifndef SDL_PLATFORM_WINRT
     {

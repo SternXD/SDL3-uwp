@@ -80,7 +80,6 @@ static ManagementThreadPendingTask *ManagementThreadPendingTasks = NULL;
 static SDL_Mutex *ManagementThreadLock = NULL;
 static SDL_Condition *ManagementThreadCondition = NULL;
 static SDL_AtomicInt ManagementThreadShutdown;
-static bool immdevice_initialized = false;
 
 static void ManagementThreadMainloop(void)
 {

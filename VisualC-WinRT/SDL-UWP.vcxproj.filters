@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Header Files">
@@ -684,9 +684,6 @@
     <ClCompile Include="..\src\render\opengles2\SDL_shaders_gles2.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\render\SDL_d3dmath.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\render\SDL_render.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -714,7 +711,7 @@
     <ClCompile Include="..\src\render\software\SDL_render_sw.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\render\software\SDL_rotate.c">
+    <ClCompile Include="..\src\video\SDL_rotate.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\src\render\software\SDL_triangle.c">

@@ -32,6 +32,7 @@
 extern "C" {
 #include "../../events/scancodes_windows.h"
 #include "../../events/SDL_keyboard_c.h"
+#include "../SDL_sysvideo.h"
 }
 
 #include "SDL_winrtvideo_cpp.h"
@@ -124,11 +125,13 @@ static bool WINRT_InputPaneVisible = false;
 void WINTRT_OnInputPaneShowing(Windows::UI::ViewManagement::InputPane ^ sender, Windows::UI::ViewManagement::InputPaneVisibilityEventArgs ^ args)
 {
     WINRT_InputPaneVisible = true;
+    SDL_SendScreenKeyboardShown();
 }
 
 void WINTRT_OnInputPaneHiding(Windows::UI::ViewManagement::InputPane ^ sender, Windows::UI::ViewManagement::InputPaneVisibilityEventArgs ^ args)
 {
     WINRT_InputPaneVisible = false;
+    SDL_SendScreenKeyboardHidden();
 }
 
 void WINTRT_InitialiseInputPaneEvents(SDL_VideoDevice *_this)

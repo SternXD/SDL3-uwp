@@ -447,11 +447,9 @@ void WIN_GL_InitExtensions(SDL_VideoDevice *_this)
     if (!hwnd) {
         return;
     }
-#ifdef SDL_PLATFORM_WINRT
-    WIN_PumpEventsForHWND(_this, hwnd);
-#else
-    WIN_PumpEvents(_this);
-#endif
+    if (_this->PumpEvents) {
+        _this->PumpEvents(_this);
+    }
 
     hdc = GetDC(hwnd);
 
@@ -548,13 +546,15 @@ void WIN_GL_InitExtensions(SDL_VideoDevice *_this)
     _this->gl_data->wglMakeCurrent(hdc, NULL);
     _this->gl_data->wglDeleteContext(hglrc);
     ReleaseDC(hwnd, hdc);
-#ifndef SDL_PLATFORM_WINRT
-    DestroyWindow(hwnd);
-#if defined(SDL_PLATFORM_WINRT)
-    WIN_PumpEvents(_this);
+#ifdef SDL_PLATFORM_WINRT
+    if (_this->PumpEvents) {
+        _this->PumpEvents(_this);
+    }
 #else
-    WIN_PumpEventsForHWND(_this, hwnd);
-#endif
+    DestroyWindow(hwnd);
+    if (_this->PumpEvents) {
+        _this->PumpEvents(_this);
+    }
 #endif
 }
 
@@ -573,7 +573,9 @@ static int WIN_GL_ChoosePixelFormatARB(SDL_VideoDevice *_this, int *iAttribs, fl
     hwnd =
         CreateWindow(SDL_Appname, SDL_Appname, (WS_POPUP | WS_DISABLED), 0, 0,
                      10, 10, NULL, NULL, SDL_Instance, NULL);
-    WIN_PumpEvents(_this);
+    if (_this->PumpEvents) {
+        _this->PumpEvents(_this);
+    }
 #endif
 
     hdc = GetDC(hwnd);
@@ -604,12 +606,15 @@ static int WIN_GL_ChoosePixelFormatARB(SDL_VideoDevice *_this, int *iAttribs, fl
         _this->gl_data->wglDeleteContext(hglrc);
     }
     ReleaseDC(hwnd, hdc);
-#ifndef SDL_PLATFORM_WINRT
-    DestroyWindow(hwnd);
 #ifdef SDL_PLATFORM_WINRT
-    WIN_PumpEventsForHWND(_this, hwnd);
+    if (_this->PumpEvents) {
+        _this->PumpEvents(_this);
+    }
 #else
-    WIN_PumpEvents(_this);
+    DestroyWindow(hwnd);
+    if (_this->PumpEvents) {
+        _this->PumpEvents(_this);
+    }
 #endif
 
     return pixel_format;
