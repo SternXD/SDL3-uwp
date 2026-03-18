@@ -326,7 +326,6 @@
     <ClCompile Include="..\src\render\opengles2\SDL_shaders_gles2.c" />
     <ClCompile Include="..\src\render\opengl\SDL_render_gl.c" />
     <ClCompile Include="..\src\render\opengl\SDL_shaders_gl.c" />
-    <ClCompile Include="..\src\render\SDL_d3dmath.c" />
     <ClCompile Include="..\src\render\SDL_render.c" />
     <ClCompile Include="..\src\render\SDL_render_unsupported.c" />
     <ClCompile Include="..\src\render\SDL_yuv_sw.c" />
@@ -336,7 +335,7 @@
     <ClCompile Include="..\src\render\software\SDL_drawline.c" />
     <ClCompile Include="..\src\render\software\SDL_drawpoint.c" />
     <ClCompile Include="..\src\render\software\SDL_render_sw.c" />
-    <ClCompile Include="..\src\render\software\SDL_rotate.c" />
+    <ClCompile Include="..\src\video\SDL_rotate.c" />
     <ClCompile Include="..\src\render\software\SDL_triangle.c" />
     <ClCompile Include="..\src\SDL.c" />
     <ClCompile Include="..\src\SDL_assert.c" />
