@@ -20,7 +20,7 @@
 */
 #include "SDL_internal.h"
 
-#if defined(SDL_PLATFORM_WINDOWS) && defined(HAVE_MMDEVICEAPI_H)
+#if defined(SDL_PLATFORM_WINDOWS) && defined(HAVE_MMDEVICEAPI_H) && !defined(SDL_PLATFORM_WINRT)
 
 #include "SDL_windows.h"
 #include "SDL_immdevice.h"
@@ -38,6 +38,7 @@ static const ERole SDL_IMMDevice_role = eConsole; // !!! FIXME: should this be e
 // This is global to the WASAPI target, to handle hotplug and default device lookup.
 static IMMDeviceEnumerator *enumerator = NULL;
 static SDL_IMMDevice_callbacks immcallbacks;
+static bool immdevice_initialized = false;
 
 // PropVariantInit() is an inline function/macro in PropIdl.h that calls the C runtime's memset() directly. Use ours instead, to avoid dependency.
 #ifdef PropVariantInit
@@ -345,6 +346,7 @@ bool SDL_IMMDevice_Init(const SDL_IMMDevice_callbacks *callbacks)
         immcallbacks.default_audio_device_changed = SDL_DefaultAudioDeviceChanged;
     }
 
+    immdevice_initialized = true;
     return true;
 }
 
@@ -357,6 +359,7 @@ void SDL_IMMDevice_Quit(void)
     }
 
     SDL_zero(immcallbacks);
+    immdevice_initialized = false;
 
     WIN_CoUninitialize();
 }
@@ -475,4 +478,4 @@ void SDL_IMMDevice_EnumerateEndpoints(SDL_AudioDevice **default_playback, SDL_Au
     IMMDeviceEnumerator_RegisterEndpointNotificationCallback(enumerator, (IMMNotificationClient *)&notification_client);
 }
 
-#endif // defined(SDL_PLATFORM_WINDOWS) && defined(HAVE_MMDEVICEAPI_H)
+#endif // defined(SDL_PLATFORM_WINDOWS) && defined(HAVE_MMDEVICEAPI_H) && !defined(SDL_PLATFORM_WINRT)
