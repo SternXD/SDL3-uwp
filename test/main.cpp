@@ -8,4 +8,13 @@
 
 #include <SDL3/SDL_main.h>
 
+#ifdef SDL_PLATFORM_WINRT
+extern "C" int testdraw_main(int argc, char *argv[]);
+
+int main(int argc, char *argv[])
+{
+    return testdraw_main(argc, argv);
+}
+#else
 // that's all, folks!
+#endif

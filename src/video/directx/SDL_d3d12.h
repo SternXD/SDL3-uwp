@@ -30,7 +30,9 @@
  * headers are included before the RPC headers, since D3D headers were
  * generated with new MIDL and "require" new RPC headers."
  */
+#ifndef __REQUIRED_RPCNDR_H_VERSION__
 #define __REQUIRED_RPCNDR_H_VERSION__ 475
+#endif
 
 // May not be defined in winapifamily.h, can safely be ignored
 #ifndef WINAPI_PARTITION_GAMES
