@@ -22,7 +22,7 @@
 
 #ifdef SDL_VIDEO_OPENGL_EGL
 
-#if defined(SDL_VIDEO_DRIVER_WINDOWS)
+#if defined(SDL_VIDEO_DRIVER_WINDOWS) || defined(SDL_VIDEO_DRIVER_WINRT)
 #include "../core/windows/SDL_windows.h"
 #endif
 #ifdef SDL_VIDEO_DRIVER_ANDROID

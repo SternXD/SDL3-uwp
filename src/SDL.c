@@ -23,7 +23,7 @@
 
 #if defined(SDL_PLATFORM_WINDOWS)
 #include "core/windows/SDL_windows.h"
-#else
+#elif !defined(SDL_PLATFORM_WINRT)
 #include <unistd.h> // _exit(), etc.
 #endif
 
@@ -69,7 +69,7 @@
 
 // Initialization/Cleanup routines
 #include "timer/SDL_timer_c.h"
-#ifdef SDL_PLATFORM_WINDOWS
+#if defined(SDL_PLATFORM_WINDOWS) && !defined(SDL_PLATFORM_WINRT) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
 extern bool SDL_HelperWindowCreate(void);
 extern void SDL_HelperWindowDestroy(void);
 #endif
@@ -357,7 +357,7 @@ bool SDL_InitSubSystem(SDL_InitFlags flags)
     SDL_DBus_Init();
 #endif
 
-#ifdef SDL_PLATFORM_WINDOWS
+#if defined(SDL_PLATFORM_WINDOWS) && !defined(SDL_PLATFORM_WINRT) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
     if (flags & (SDL_INIT_HAPTIC | SDL_INIT_JOYSTICK)) {
         if (!SDL_HelperWindowCreate()) {
             goto quit_and_error;
@@ -704,7 +704,7 @@ void SDL_Quit(void)
     SDL_bInMainQuit = true;
 
     // Quit all subsystems
-#ifdef SDL_PLATFORM_WINDOWS
+#if defined(SDL_PLATFORM_WINDOWS) && !defined(SDL_PLATFORM_WINRT) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
     SDL_HelperWindowDestroy();
 #endif
     SDL_QuitSubSystem(SDL_ALL_SUBSYSTEM_FLAGS);
@@ -799,6 +799,8 @@ const char *SDL_GetPlatform(void)
     return "Solaris";
 #elif defined(SDL_PLATFORM_WIN32)
     return "Windows";
+#elif defined(SDL_PLATFORM_WINRT)
+    return "WinRT";
 #elif defined(SDL_PLATFORM_WINGDK)
     return "WinGDK";
 #elif defined(SDL_PLATFORM_XBOXONE)

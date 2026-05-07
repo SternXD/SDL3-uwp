@@ -47,6 +47,7 @@ typedef enum RO_INIT_TYPE
 #define WC_ERR_INVALID_CHARS 0x00000080
 #endif
 
+#if !defined(SDL_PLATFORM_WINRT) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
 // Dark mode support
 typedef enum {
     UXTHEME_APPMODE_DEFAULT,
@@ -84,13 +85,14 @@ typedef void (WINAPI *RefreshImmersiveColorPolicyState_t)(void);
 typedef UxthemePreferredAppMode (WINAPI *SetPreferredAppMode_t)(UxthemePreferredAppMode);
 typedef BOOL (WINAPI *SetWindowCompositionAttribute_t)(HWND, const WINDOWCOMPOSITIONATTRIBDATA *);
 typedef void (NTAPI *RtlGetVersion_t)(NT_OSVERSIONINFOW *);
-
+#endif
 // Fake window to help with DirectInput events.
 HWND SDL_HelperWindow = NULL;
 static const TCHAR *SDL_HelperWindowClassName = TEXT("SDLHelperWindowInputCatcher");
 static const TCHAR *SDL_HelperWindowName = TEXT("SDLHelperWindowInputMsgWindow");
 static ATOM SDL_HelperWindowClass = 0;
 
+#if !defined(SDL_PLATFORM_WINRT) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
 /*
  * Creates a HelperWindow used for DirectInput.
  */
@@ -155,6 +157,18 @@ void SDL_HelperWindowDestroy(void)
         }
         SDL_HelperWindowClass = 0;
     }
+}
+#endif
+
+// Stub implementations for UWP/Xbox platforms
+bool SDL_HelperWindowCreate(void)
+{
+    return true; // No-op for UWP/Xbox
+}
+
+void SDL_HelperWindowDestroy(void)
+{
+    // No-op for UWP/Xbox
 }
 
 // Sets an error message based on an HRESULT
@@ -234,6 +248,7 @@ FARPROC WIN_LoadComBaseFunction(const char *name)
     }
 }
 
+#if !defined(SDL_PLATFORM_WINRT)
 HRESULT
 WIN_RoInitialize(void)
 {
@@ -257,17 +272,20 @@ WIN_RoInitialize(void)
         return E_NOINTERFACE;
     }
 }
+#endif // SDL_PLATFORM_WINRT
 
 void WIN_RoUninitialize(void)
 {
+#if !defined(SDL_PLATFORM_WINRT)
     typedef void(WINAPI * RoUninitialize_t)(void);
     RoUninitialize_t RoUninitializeFunc = (RoUninitialize_t)WIN_LoadComBaseFunction("RoUninitialize");
     if (RoUninitializeFunc) {
         RoUninitializeFunc();
     }
+#endif // SDL_PLATFORM_WINRT
 }
 
-#if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
+#if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES) && !defined(SDL_PLATFORM_WINRT)
 static BOOL IsWindowsVersionOrGreater(WORD wMajorVersion, WORD wMinorVersion, WORD wServicePackMajor)
 {
     OSVERSIONINFOEXW osvi;
@@ -319,7 +337,7 @@ static BOOL IsWindowsBuildVersionAtLeast(DWORD dwBuildNumber)
 #endif
 
 // apply some static variables so we only call into the Win32 API once per process for each check.
-#if defined(SDL_PLATFORM_XBOXONE) || defined(SDL_PLATFORM_XBOXSERIES)
+#if defined(SDL_PLATFORM_XBOXONE) || defined(SDL_PLATFORM_XBOXSERIES) || defined(SDL_PLATFORM_WINRT)
     #define CHECKWINVER(notdesktop_platform_result, test) return (notdesktop_platform_result);
 #else
     #define CHECKWINVER(notdesktop_platform_result, test) \
@@ -495,7 +513,7 @@ bool WIN_WindowRectValid(const RECT *rect)
 
 void WIN_UpdateDarkModeForHWND(HWND hwnd)
 {
-#if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
+#if !defined(SDL_PLATFORM_WINRT) && !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
     if (!IsWindowsBuildVersionAtLeast(17763)) {
         // Too old to support dark mode
         return;
@@ -549,7 +567,7 @@ void WIN_UpdateDarkModeForHWND(HWND hwnd)
 
 HICON WIN_CreateIconFromSurface(SDL_Surface *surface)
 {
-#if !(defined(SDL_PLATFORM_XBOXONE) || defined(SDL_PLATFORM_XBOXSERIES))
+#if !(defined(SDL_PLATFORM_WINRT) || defined(SDL_PLATFORM_XBOXONE) || defined(SDL_PLATFORM_XBOXSERIES))
     SDL_Surface *s = SDL_ConvertSurface(surface, SDL_PIXELFORMAT_ARGB8888);
     if (!s) {
         return NULL;
@@ -674,8 +692,37 @@ const char *WIN_CheckDefaultArgcArgv(int *pargc, char ***pargv, void **pallocate
 
     // We need to be careful about how we allocate/free memory here. We can't use SDL_alloc()/SDL_free()
     // because the application might have used SDL_SetMemoryFunctions() to change the allocator.
-    LPWSTR *argvw = NULL;
     char **argv = NULL;
+
+#if defined(SDL_PLATFORM_WINRT)
+    {
+        WCHAR modpath[MAX_PATH];
+        DWORD modlen = GetModuleFileNameW(NULL, modpath, MAX_PATH);
+        if (modlen == 0 || modlen >= MAX_PATH) {
+            return proc_err_str;
+        }
+        const int mod_utf8_size = WideCharToMultiByte(CP_UTF8, 0, modpath, -1, NULL, 0, NULL, NULL);
+        if (!mod_utf8_size) {
+            return proc_err_str;
+        }
+        argv = (char **)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, 2 * sizeof(*argv) + mod_utf8_size);
+        if (!argv) {
+            return out_of_mem_str;
+        }
+        char *argdata = ((char *)argv) + 2 * sizeof(*argv);
+        if (!WideCharToMultiByte(CP_UTF8, 0, modpath, -1, argdata, mod_utf8_size, NULL, NULL)) {
+            HeapFree(GetProcessHeap(), 0, argv);
+            return proc_err_str;
+        }
+        argv[0] = argdata;
+        argv[1] = NULL;
+        *pargc = 1;
+        *pallocated = argv;
+        *pargv = argv;
+        return NULL;
+    }
+#else
+    LPWSTR *argvw = NULL;
 
     const LPWSTR command_line = GetCommandLineW();
 
@@ -723,6 +770,7 @@ const char *WIN_CheckDefaultArgcArgv(int *pargc, char ***pargv, void **pallocate
     *pargv = argv;
 
     return NULL;  // no error string.
+#endif // !defined(SDL_PLATFORM_WINRT)
 }
 
 #endif // defined(SDL_PLATFORM_WINDOWS)
