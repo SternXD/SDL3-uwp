@@ -28,7 +28,9 @@
 #define SDL_D3D12_NUM_UPLOAD_BUFFERS 32
 
 #include "../../core/windows/SDL_windows.h"
+#ifndef SDL_PLATFORM_WINRT
 #include "../../video/windows/SDL_windowswindow.h"
+#endif
 #include "../SDL_sysrender.h"
 #include "../SDL_d3dmath.h"
 #include "../../video/directx/SDL_d3d12.h"
@@ -38,6 +40,11 @@
 #endif
 
 #include "SDL_shaders_d3d12.h"
+
+#ifdef SDL_PLATFORM_WINRT
+#include "SDL_render_d3d12_winrt.h"
+#include <windows.ui.xaml.media.dxinterop.h>
+#endif
 
 // Set up for C function definitions, even when using C++
 #ifdef __cplusplus
@@ -840,6 +847,10 @@ static HRESULT D3D12_CreateDeviceResources(SDL_Renderer *renderer)
     }
 
 #if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
+#ifdef SDL_PLATFORM_WINRT
+    pCreateDXGIFactory2 = CreateDXGIFactory2;
+    pD3D12CreateDevice = D3D12CreateDevice;
+#else
     data->hDXGIMod = SDL_LoadObject("dxgi.dll");
     if (!data->hDXGIMod) {
         result = E_FAIL;
@@ -863,11 +874,15 @@ static HRESULT D3D12_CreateDeviceResources(SDL_Renderer *renderer)
         result = E_FAIL;
         goto done;
     }
+#endif // SDL_PLATFORM_WINRT
 
     if (createDebug) {
-        PFN_D3D12_GET_DEBUG_INTERFACE D3D12GetDebugInterfaceFunc;
-
+        PFN_D3D12_GET_DEBUG_INTERFACE D3D12GetDebugInterfaceFunc = NULL;
+#ifdef SDL_PLATFORM_WINRT
+        D3D12GetDebugInterfaceFunc = D3D12GetDebugInterface;
+#else
         D3D12GetDebugInterfaceFunc = (PFN_D3D12_GET_DEBUG_INTERFACE)SDL_LoadFunction(data->hD3D12Mod, "D3D12GetDebugInterface");
+#endif
         if (!D3D12GetDebugInterfaceFunc) {
             result = E_FAIL;
             goto done;
@@ -886,6 +901,7 @@ static HRESULT D3D12_CreateDeviceResources(SDL_Renderer *renderer)
     }
 #else
     if (createDebug) {
+#ifndef SDL_PLATFORM_WINRT
 #ifdef __IDXGIInfoQueue_INTERFACE_DEFINED__
         IDXGIInfoQueue *dxgiInfoQueue = NULL;
         pfnCreateDXGIFactory2 DXGIGetDebugInterfaceFunc;
@@ -914,6 +930,7 @@ static HRESULT D3D12_CreateDeviceResources(SDL_Renderer *renderer)
         D3D_SAFE_RELEASE(dxgiInfoQueue);
 #endif // __IDXGIInfoQueue_INTERFACE_DEFINED__
         creationFlags = DXGI_CREATE_FACTORY_DEBUG;
+#endif // !SDL_PLATFORM_WINRT
     }
 
     result = pCreateDXGIFactory2(creationFlags, D3D_GUID(SDL_IID_IDXGIFactory6), (void **)&data->dxgiFactory);
@@ -1161,11 +1178,13 @@ done:
     return result;
 }
 
+#ifndef SDL_PLATFORM_WINRT
 static DXGI_MODE_ROTATION D3D12_GetCurrentRotation(void)
 {
     // FIXME
     return DXGI_MODE_ROTATION_IDENTITY;
 }
+#endif
 
 static BOOL D3D12_IsDisplayRotated90Degrees(DXGI_MODE_ROTATION rotation)
 {
@@ -1235,6 +1254,17 @@ static bool D3D12_GetViewportAlignedD3DRect(SDL_Renderer *renderer, const SDL_Re
 static HRESULT D3D12_CreateSwapChain(SDL_Renderer *renderer, int w, int h)
 {
     D3D12_RenderData *data = (D3D12_RenderData *)renderer->internal;
+#ifdef SDL_PLATFORM_WINRT
+    IUnknown *coreWindow = D3D12_GetCoreWindowFromSDLRenderer(renderer);
+    ISwapChainBackgroundPanelNative *panel = (ISwapChainBackgroundPanelNative *)SDL_GetPointerProperty(
+        SDL_GetWindowProperties(renderer->window),
+        SDL_PROP_WINDOW_WINRT_SWAPCHAIN_BACKGROUND_PANEL_POINTER,
+        NULL);
+    const BOOL usingXAML = (panel != NULL);
+#else
+    IUnknown *coreWindow = NULL;
+    const BOOL usingXAML = FALSE;
+#endif
     IDXGISwapChain1 *swapChain = NULL;
     HRESULT result = S_OK;
 
@@ -1262,35 +1292,93 @@ static HRESULT D3D12_CreateSwapChain(SDL_Renderer *renderer, int w, int h)
     swapChainDesc.SampleDesc.Quality = 0;
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     swapChainDesc.BufferCount = 2; // Use double-buffering to minimize latency.
-    if (WIN_IsWindows8OrGreater()) {
+#if SDL_WINAPI_FAMILY_PHONE
+    swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
+    swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
+#else
+    if (usingXAML) {
+        swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
+    } else if (WIN_IsWindows8OrGreater()) {
         swapChainDesc.Scaling = DXGI_SCALING_NONE;
     } else {
         swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
     }
-    swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;               // All Windows Store apps must use this SwapEffect.
+    swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL; // All Windows Store apps must use this SwapEffect.
+#endif
+#ifdef SDL_PLATFORM_WINRT
+    swapChainDesc.Flags = 0;
+#else
     swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT | // To support SetMaximumFrameLatency
                           DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;                  // To support presenting with allow tearing on
+#endif
 
-    HWND hwnd = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(renderer->window), SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
-    if (!hwnd) {
-        SDL_SetError("Couldn't get window handle");
+    if (coreWindow) {
+        result = IDXGIFactory2_CreateSwapChainForCoreWindow(data->dxgiFactory,
+                          (IUnknown *)data->commandQueue,
+                          coreWindow,
+                          &swapChainDesc,
+                          NULL, // Allow on all displays.
+                          &swapChain);
+        if (FAILED(result)) {
+            WIN_SetErrorFromHRESULT("IDXGIFactory2::CreateSwapChainForCoreWindow", result);
+            goto done;
+        }
+    } else if (usingXAML) {
+#ifdef SDL_PLATFORM_WINRT
+        result = IDXGIFactory2_CreateSwapChainForComposition(data->dxgiFactory,
+                          (IUnknown *)data->commandQueue,
+                          &swapChainDesc,
+                          NULL,
+                          &swapChain);
+        if (FAILED(result)) {
+            WIN_SetErrorFromHRESULT("IDXGIFactory2::CreateSwapChainForComposition", result);
+            goto done;
+        }
+
+        if (!panel) {
+            SDL_SetError("XAML SwapChainBackgroundPanel was not set on the window");
+            result = E_FAIL;
+            goto done;
+        }
+
+        result = ISwapChainBackgroundPanelNative_SetSwapChain(panel, (IDXGISwapChain *)swapChain);
+        if (FAILED(result)) {
+            WIN_SetErrorFromHRESULT("ISwapChainBackgroundPanelNative::SetSwapChain", result);
+            goto done;
+        }
+#else
+        SDL_SetError("XAML support is not available on this platform");
         result = E_FAIL;
         goto done;
-    }
+#endif
+    } else {
+#if defined(SDL_PLATFORM_WIN32) || defined(SDL_PLATFORM_WINGDK)
+        HWND hwnd = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(renderer->window), SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
+        if (!hwnd) {
+            SDL_SetError("Couldn't get window handle");
+            result = E_FAIL;
+            goto done;
+        }
 
-    result = IDXGIFactory2_CreateSwapChainForHwnd(data->dxgiFactory,
-                      (IUnknown *)data->commandQueue,
-                      hwnd,
-                      &swapChainDesc,
-                      NULL,
-                      NULL, // Allow on all displays.
-                      &swapChain);
-    if (FAILED(result)) {
-        WIN_SetErrorFromHRESULT("IDXGIFactory2::CreateSwapChainForHwnd", result);
+        result = IDXGIFactory2_CreateSwapChainForHwnd(data->dxgiFactory,
+                          (IUnknown *)data->commandQueue,
+                          hwnd,
+                          &swapChainDesc,
+                          NULL,
+                          NULL, // Allow on all displays.
+                          &swapChain);
+        if (FAILED(result)) {
+            WIN_SetErrorFromHRESULT("IDXGIFactory2::CreateSwapChainForHwnd", result);
+            goto done;
+        }
+
+        IDXGIFactory6_MakeWindowAssociation(data->dxgiFactory, hwnd, DXGI_MWA_NO_WINDOW_CHANGES);
+#else
+        SDL_SetError("Unable to find something to attach a swap chain to");
+        result = E_FAIL;
         goto done;
+#endif
     }
-
-    IDXGIFactory6_MakeWindowAssociation(data->dxgiFactory, hwnd, DXGI_MWA_NO_WINDOW_CHANGES);
 
     result = IDXGISwapChain1_QueryInterface(swapChain, D3D_GUID(SDL_IID_IDXGISwapChain4), (void **)&data->swapChain);
     if (FAILED(result)) {
@@ -1298,6 +1386,7 @@ static HRESULT D3D12_CreateSwapChain(SDL_Renderer *renderer, int w, int h)
         goto done;
     }
 
+#ifndef SDL_PLATFORM_WINRT
     /* Ensure that the swapchain does not queue more than one frame at a time. This both reduces latency
      * and ensures that the application will only render after each VSync, minimizing power consumption.
      */
@@ -1306,6 +1395,7 @@ static HRESULT D3D12_CreateSwapChain(SDL_Renderer *renderer, int w, int h)
         WIN_SetErrorFromHRESULT("IDXGISwapChain4::SetMaximumFrameLatency", result);
         goto done;
     }
+#endif
 
     data->swapEffect = swapChainDesc.SwapEffect;
     data->swapFlags = swapChainDesc.Flags;
@@ -1340,6 +1430,9 @@ static HRESULT D3D12_CreateSwapChain(SDL_Renderer *renderer, int w, int h)
     SDL_SetPointerProperty(SDL_GetRendererProperties(renderer), SDL_PROP_RENDERER_D3D12_SWAPCHAIN_POINTER, data->swapChain);
 
 done:
+#ifdef SDL_PLATFORM_WINRT
+    D3D_SAFE_RELEASE(coreWindow);
+#endif
     D3D_SAFE_RELEASE(swapChain);
     return result;
 }
@@ -1367,7 +1460,11 @@ static HRESULT D3D12_CreateWindowSizeDependentResources(SDL_Renderer *renderer)
     /* The width and height of the swap chain must be based on the display's
      * non-rotated size.
      */
+#ifdef SDL_PLATFORM_WINRT
+    SDL_GetWindowSize(renderer->window, &w, &h);
+#else
     SDL_GetWindowSizeInPixels(renderer->window, &w, &h);
+#endif
     data->rotation = D3D12_GetCurrentRotation();
     if (D3D12_IsDisplayRotated90Degrees(data->rotation)) {
         int tmp = w;
@@ -1377,6 +1474,8 @@ static HRESULT D3D12_CreateWindowSizeDependentResources(SDL_Renderer *renderer)
 
 #if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
     if (data->swapChain) {
+// IDXGISwapChain::ResizeBuffers is not available on Windows Phone 8.
+#if !defined(SDL_PLATFORM_WINRT) || !SDL_WINAPI_FAMILY_PHONE
         // If the swap chain already exists, resize it.
         result = IDXGISwapChain_ResizeBuffers(data->swapChain,
                           0,
@@ -1387,6 +1486,7 @@ static HRESULT D3D12_CreateWindowSizeDependentResources(SDL_Renderer *renderer)
             WIN_SetErrorFromHRESULT("IDXGISwapChain::ResizeBuffers", result);
             goto done;
         }
+#endif
     } else {
         result = D3D12_CreateSwapChain(renderer, w, h);
         if (FAILED(result) || !data->swapChain) {
@@ -1395,6 +1495,7 @@ static HRESULT D3D12_CreateWindowSizeDependentResources(SDL_Renderer *renderer)
     }
 
     // Set the proper rotation for the swap chain.
+#if !defined(SDL_PLATFORM_WINRT) || !SDL_WINAPI_FAMILY_PHONE
     if (WIN_IsWindows8OrGreater()) {
         if (data->swapEffect == DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL) {
             result = IDXGISwapChain4_SetRotation(data->swapChain, data->rotation); // NOLINT(clang-analyzer-core.NullDereference)
@@ -1404,6 +1505,7 @@ static HRESULT D3D12_CreateWindowSizeDependentResources(SDL_Renderer *renderer)
             }
         }
     }
+#endif
 #endif // !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
 
     // Get each back buffer render target and create render target views
@@ -1550,7 +1652,7 @@ static bool GetTextureProperty(SDL_PropertiesID props, const char *name, ID3D12R
 #if defined(SDL_PLATFORM_XBOXONE) || defined(SDL_PLATFORM_XBOXSERIES)
         HRESULT result = unknown->QueryInterface(D3D_GUID(SDL_IID_ID3D12Resource), (void **)texture);
 #else
-        HRESULT result = IUnknown_QueryInterface(unknown, D3D_GUID(SDL_IID_ID3D12Resource), (void **)texture);
+        HRESULT result = unknown->lpVtbl->QueryInterface(unknown, D3D_GUID(SDL_IID_ID3D12Resource), (void **)texture);
 #endif
         if (FAILED(result)) {
             return WIN_SetErrorFromHRESULT(name, result);
@@ -3482,7 +3584,11 @@ static bool D3D12_SetVSync(SDL_Renderer *renderer, const int vsync)
         data->presentFlags = 0;
     } else {
         data->syncInterval = 0;
+#ifdef SDL_PLATFORM_WINRT
+        data->presentFlags = 0;
+#else
         data->presentFlags = DXGI_PRESENT_ALLOW_TEARING;
+#endif
     }
     return true;
 }
@@ -3491,10 +3597,12 @@ bool D3D12_CreateRenderer(SDL_Renderer *renderer, SDL_Window *window, SDL_Proper
 {
     D3D12_RenderData *data;
 
+#ifndef SDL_PLATFORM_WINRT
     HWND hwnd = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
     if (!hwnd) {
         return SDL_SetError("Couldn't get window handle");
     }
+#endif
 
     if (SDL_GetWindowFlags(window) & SDL_WINDOW_TRANSPARENT) {
 		// D3D12 removed the swap effect needed to support transparent windows, use D3D11 instead
@@ -3560,7 +3668,11 @@ bool D3D12_CreateRenderer(SDL_Renderer *renderer, SDL_Window *window, SDL_Proper
     SDL_SetNumberProperty(SDL_GetRendererProperties(renderer), SDL_PROP_RENDERER_MAX_TEXTURE_SIZE_NUMBER, 16384);
 
     data->syncInterval = 0;
+#ifdef SDL_PLATFORM_WINRT
+    data->presentFlags = 0;
+#else
     data->presentFlags = DXGI_PRESENT_ALLOW_TEARING;
+#endif
 
     /* HACK: make sure the SDL_Renderer references the SDL_Window data now, in
      * order to give init functions access to the underlying window handle:

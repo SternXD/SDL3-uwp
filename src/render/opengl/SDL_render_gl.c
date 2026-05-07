@@ -1764,7 +1764,9 @@ static bool GL_CreateRenderer(SDL_Renderer *renderer, SDL_Window *window, SDL_Pr
 {
     GL_RenderData *data = NULL;
     GLint value;
+#if !defined SDL_VIDEO_VITA_PVR_OGL && !defined SDL_PLATFORM_WINRT
     SDL_WindowFlags window_flags = 0;
+#endif
     int profile_mask = 0, major = 0, minor = 0;
     int real_major = 0, real_minor = 0;
     bool changed_window = false;
@@ -1789,7 +1791,7 @@ static bool GL_CreateRenderer(SDL_Renderer *renderer, SDL_Window *window, SDL_Pr
         goto error;
     }
 
-#ifndef SDL_VIDEO_VITA_PVR_OGL
+#if !defined SDL_VIDEO_VITA_PVR_OGL && !defined SDL_PLATFORM_WINRT
     SDL_SyncWindow(window);
     window_flags = SDL_GetWindowFlags(window);
     if (!(window_flags & SDL_WINDOW_OPENGL) ||
@@ -2048,7 +2050,9 @@ error:
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, profile_mask);
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, major);
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, minor);
+#ifndef SDL_PLATFORM_WINRT
         SDL_RecreateWindow(window, window_flags);
+#endif
         SDL_SetError("%s", error);
         SDL_free(error);
     }
