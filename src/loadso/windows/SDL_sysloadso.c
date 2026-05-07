@@ -29,13 +29,23 @@
 
 SDL_SharedObject *SDL_LoadObject(const char *sofile)
 {
-    CHECK_PARAM(!sofile) {
+    void *handle;
+    LPWSTR wstr;
+
+    if (!sofile) {
         SDL_InvalidParamError("sofile");
         return NULL;
     }
-
-    LPWSTR wstr = WIN_UTF8ToStringW(sofile);
-    HMODULE handle = LoadLibraryW(wstr);
+    wstr = WIN_UTF8ToStringW(sofile);
+#ifdef SDL_PLATFORM_WINRT
+    /* WinRT only publicly supports LoadPackagedLibrary() for loading .dll
+       files.  LoadLibrary() is a private API, and not available for apps
+       (that can be published to MS' Windows Store.)
+    */
+    handle = (void *)LoadPackagedLibrary(wstr, 0);
+#else
+    handle = (void *)LoadLibrary(wstr);
+#endif
     SDL_free(wstr);
 
     // Generate an error message if all loads failed

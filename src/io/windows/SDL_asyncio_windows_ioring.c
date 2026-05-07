@@ -488,10 +488,22 @@ static bool SDL_SYS_AsyncIOFromFile_ioring(const char *file, const char *mode, S
         return false;
     }
 
+#if defined(SDL_PLATFORM_WINRT)
+    CREATEFILE2_EXTENDED_PARAMETERS extparams;
+    SDL_zero(extparams);
+    extparams.dwSize = sizeof(extparams);
+    extparams.dwFileAttributes = FILE_ATTRIBUTE_NORMAL;
+    HANDLE handle = CreateFile2(wstr, access_mode, FILE_SHARE_READ, create_mode, &extparams);
+#else
     HANDLE handle = CreateFileW(wstr, access_mode, FILE_SHARE_READ, NULL, create_mode, FILE_ATTRIBUTE_NORMAL, NULL);
+#endif
     SDL_free(wstr);
-    if (!handle) {
+    if (handle == INVALID_HANDLE_VALUE) {
+#if defined(SDL_PLATFORM_WINRT)
+        return WIN_SetError("CreateFile2");
+#else
         return WIN_SetError("CreateFileW");
+#endif
     }
 
     static const SDL_AsyncIOInterface SDL_AsyncIOFile_ioring = {

@@ -26,35 +26,35 @@
 #ifdef SDL_VIDEO_OPENGL_WGL
 
 #if defined(SDL_PLATFORM_XBOXONE) || defined(SDL_PLATFORM_XBOXSERIES)
-typedef struct tagPIXELFORMATDESCRIPTOR
-{
-    WORD nSize;
-    WORD nVersion;
-    DWORD dwFlags;
-    BYTE iPixelType;
-    BYTE cColorBits;
-    BYTE cRedBits;
-    BYTE cRedShift;
-    BYTE cGreenBits;
-    BYTE cGreenShift;
-    BYTE cBlueBits;
-    BYTE cBlueShift;
-    BYTE cAlphaBits;
-    BYTE cAlphaShift;
-    BYTE cAccumBits;
-    BYTE cAccumRedBits;
-    BYTE cAccumGreenBits;
-    BYTE cAccumBlueBits;
-    BYTE cAccumAlphaBits;
-    BYTE cDepthBits;
-    BYTE cStencilBits;
-    BYTE cAuxBuffers;
-    BYTE iLayerType;
-    BYTE bReserved;
-    DWORD dwLayerMask;
-    DWORD dwVisibleMask;
-    DWORD dwDamageMask;
-} PIXELFORMATDESCRIPTOR, *PPIXELFORMATDESCRIPTOR, *LPPIXELFORMATDESCRIPTOR;
+//typedef struct tagPIXELFORMATDESCRIPTOR
+//{
+//    WORD nSize;
+//    WORD nVersion;
+//    DWORD dwFlags;
+//    BYTE iPixelType;
+//    BYTE cColorBits;
+//    BYTE cRedBits;
+//    BYTE cRedShift;
+//    BYTE cGreenBits;
+//    BYTE cGreenShift;
+//    BYTE cBlueBits;
+//    BYTE cBlueShift;
+//    BYTE cAlphaBits;
+//    BYTE cAlphaShift;
+//    BYTE cAccumBits;
+//    BYTE cAccumRedBits;
+//    BYTE cAccumGreenBits;
+//    BYTE cAccumBlueBits;
+//    BYTE cAccumAlphaBits;
+//    BYTE cDepthBits;
+//    BYTE cStencilBits;
+//    BYTE cAuxBuffers;
+//    BYTE iLayerType;
+//    BYTE bReserved;
+//    DWORD dwLayerMask;
+//    DWORD dwVisibleMask;
+//    DWORD dwDamageMask;
+//} PIXELFORMATDESCRIPTOR, *PPIXELFORMATDESCRIPTOR, *LPPIXELFORMATDESCRIPTOR;
 #endif
 
 struct SDL_GLDriverData
@@ -111,8 +111,7 @@ extern void WIN_GL_UnloadLibrary(SDL_VideoDevice *_this);
 extern bool WIN_GL_UseEGL(SDL_VideoDevice *_this);
 extern bool WIN_GL_SetupWindow(SDL_VideoDevice *_this, SDL_Window *window);
 extern SDL_GLContext WIN_GL_CreateContext(SDL_VideoDevice *_this, SDL_Window *window);
-extern bool WIN_GL_MakeCurrent(SDL_VideoDevice *_this, SDL_Window *window,
-                              SDL_GLContext context);
+extern bool WIN_GL_MakeCurrent(SDL_VideoDevice *_this, SDL_Window *window, SDL_GLContext context);
 extern bool WIN_GL_SetSwapInterval(SDL_VideoDevice *_this, int interval);
 extern bool WIN_GL_GetSwapInterval(SDL_VideoDevice *_this, int *interval);
 extern bool WIN_GL_SwapWindow(SDL_VideoDevice *_this, SDL_Window *window);

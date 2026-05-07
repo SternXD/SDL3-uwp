@@ -1011,6 +1011,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\audio\wasapi\SDL_wasapi.c" />
+    <ClCompile Include="..\..\src\audio\wasapi\SDL_wasapi_win32.c" />
     <ClCompile Include="..\..\src\camera\dummy\SDL_camera_dummy.c">
       <Filter>camera\dummy</Filter>
     </ClCompile>
