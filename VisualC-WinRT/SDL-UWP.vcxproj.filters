@@ -37,6 +37,9 @@
     <Filter Include="main\winrt">
       <UniqueIdentifier>{00006680a11742e2b280c6453be80000}</UniqueIdentifier>
     </Filter>
+    <Filter Include="dialog\winrt">
+      <UniqueIdentifier>{77015944-34d7-43ca-962b-c894deb2dd5e}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\SDL3\SDL_begin_code.h">
@@ -999,6 +1002,9 @@
     <ClCompile Include="..\src\video\yuv2rgb\yuv_rgb_lsx.c" />
     <ClCompile Include="..\src\video\yuv2rgb\yuv_rgb_sse.c" />
     <ClCompile Include="..\src\video\yuv2rgb\yuv_rgb_std.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <MASM Include="..\src\stdlib\SDL_mslibc_x64.masm" />
   </ItemGroup>
   <ItemGroup>
     <MASM Include="..\src\stdlib\SDL_mslibc_x64.masm" />
