@@ -38,6 +38,19 @@
 #include <dxgi1_2.h>
 #include <windows.graphics.display.h>
 #include <windows.system.display.h>
+#if defined(__has_include)
+#if __has_include(<windows.graphics.display.core.h>)
+#include <windows.graphics.display.core.h>
+#define SDL_WINRT_HAVE_HDMI_DISPLAY_INFORMATION 1
+#elif __has_include(<Windows.Graphics.Display.Core.h>)
+#include <Windows.Graphics.Display.Core.h>
+#define SDL_WINRT_HAVE_HDMI_DISPLAY_INFORMATION 1
+#endif
+#if __has_include(<gamingdeviceinformation.h>)
+#include <gamingdeviceinformation.h>
+#define SDL_WINRT_HAVE_GAMING_DEVICE_INFORMATION 1
+#endif
+#endif
 using namespace Windows::ApplicationModel::Core;
 using namespace Windows::Foundation;
 using namespace Windows::Graphics::Display;
@@ -58,6 +71,8 @@ extern "C" {
 #include "../SDL_pixels_c.h"
 #include "SDL_winrtopengles.h"
 #include "SDL_winrtmessagebox.h"
+#include <SDL3/SDL_system.h>
+#include <SDL3/SDL_video.h>
 }
 
 #include "../../core/winrt/SDL_winrtapp_direct3d.h"
@@ -81,10 +96,224 @@ static void WINRT_DestroyWindow(SDL_VideoDevice *_this, SDL_Window *window);
 
 // Misc functions
 static ABI::Windows::System::Display::IDisplayRequest *WINRT_CreateDisplayRequest(SDL_VideoDevice *_this);
+static void WINRT_GetWindowSizeInPixels(SDL_VideoDevice *_this, SDL_Window *window, int *w, int *h);
 extern bool WINRT_SuspendScreenSaver(SDL_VideoDevice *_this);
 
 // SDL-internal globals:
 SDL_Window *WINRT_GlobalSDLWindow = NULL;
+
+static int WINRT_CachedOutputWidth;
+static int WINRT_CachedOutputHeight;
+static bool WINRT_CachedOutputValid;
+static bool WINRT_CachedUsingDisplayResolution;
+static bool WINRT_CachedDisplayModeQueryFailed;
+static bool WINRT_CachedOutputLogged;
+static bool WINRT_OutputSizeResolved;
+
+static void WINRT_GetGamingDeviceMaxResolution(Uint32 *max_w, Uint32 *max_h)
+{
+#ifndef SDL_WINRT_HAVE_GAMING_DEVICE_INFORMATION
+    *max_w = 3840;
+    *max_h = 2160;
+#else
+    GAMING_DEVICE_MODEL_INFORMATION info;
+    SDL_zero(info);
+    if (!GetGamingDeviceModelInformation(&info)) {
+        *max_w = 1920;
+        *max_h = 1080;
+        return;
+    }
+    if (info.vendorId != GAMING_DEVICE_VENDOR_ID_MICROSOFT) {
+        *max_w = 3840;
+        *max_h = 2160;
+        return;
+    }
+
+    *max_w = 1920;
+    *max_h = 1080;
+    switch (info.deviceId) {
+    case GAMING_DEVICE_DEVICE_ID_XBOX_ONE:
+    case GAMING_DEVICE_DEVICE_ID_XBOX_ONE_S:
+        break;
+    case GAMING_DEVICE_DEVICE_ID_XBOX_SERIES_S:
+        *max_w = 2560;
+        *max_h = 1440;
+        break;
+    case GAMING_DEVICE_DEVICE_ID_XBOX_ONE_X:
+    case GAMING_DEVICE_DEVICE_ID_XBOX_ONE_X_DEVKIT:
+    case GAMING_DEVICE_DEVICE_ID_XBOX_SERIES_X:
+    case GAMING_DEVICE_DEVICE_ID_XBOX_SERIES_X_DEVKIT:
+        *max_w = 3840;
+        *max_h = 2160;
+        break;
+    default:
+        break;
+    }
+#endif
+}
+
+static void WINRT_LogOutputResolutionOnce(void)
+{
+    if (WINRT_CachedOutputLogged) {
+        return;
+    }
+    WINRT_CachedOutputLogged = true;
+    char model[128];
+#ifdef SDL_WINRT_HAVE_GAMING_DEVICE_INFORMATION
+    GAMING_DEVICE_MODEL_INFORMATION info;
+    SDL_zero(info);
+    if (GetGamingDeviceModelInformation(&info)) {
+        (void)SDL_snprintf(model, sizeof(model), "vendorId=0x%X deviceId=0x%X",
+                           (unsigned)info.vendorId, (unsigned)info.deviceId);
+    } else {
+        SDL_strlcpy(model, "gaming device unknown", sizeof(model));
+    }
+#else
+    SDL_strlcpy(model, "gaming device API unavailable", sizeof(model));
+#endif
+    if (WINRT_CachedDisplayModeQueryFailed) {
+        SDL_Log("WinRT: Failed to get HDMI display mode (%s), using device maximum: %dx%d",
+                model, WINRT_CachedOutputWidth, WINRT_CachedOutputHeight);
+    } else if (WINRT_CachedUsingDisplayResolution) {
+        SDL_Log("WinRT: Using display resolution (%s): %dx%d", model,
+                WINRT_CachedOutputWidth, WINRT_CachedOutputHeight);
+    } else {
+        SDL_Log("WinRT: Using device maximum resolution (%s): %dx%d", model,
+                WINRT_CachedOutputWidth, WINRT_CachedOutputHeight);
+    }
+}
+
+static void WINRT_ResolveOutputSize(void)
+{
+    if (WINRT_OutputSizeResolved) {
+        return;
+    }
+    WINRT_OutputSizeResolved = true;
+
+    const bool is_xbox_family = (SDL_GetWinRTDeviceFamily() == SDL_WINRT_DEVICEFAMILY_XBOX);
+
+    Uint32 max_w = 1920;
+    Uint32 max_h = 1080;
+    WINRT_GetGamingDeviceMaxResolution(&max_w, &max_h);
+
+    Uint32 display_w = 0;
+    Uint32 display_h = 0;
+    WINRT_CachedDisplayModeQueryFailed = false;
+
+#if defined(SDL_WINRT_HAVE_HDMI_DISPLAY_INFORMATION)
+    try {
+        Windows::Graphics::Display::Core::HdmiDisplayInformation ^ hdi =
+            Windows::Graphics::Display::Core::HdmiDisplayInformation::GetForCurrentView();
+        if (hdi != nullptr) {
+            Windows::Graphics::Display::Core::HdmiDisplayMode ^ mode = hdi->GetCurrentDisplayMode();
+            if (mode != nullptr) {
+                display_w = (Uint32)mode->ResolutionWidthInRawPixels;
+                display_h = (Uint32)mode->ResolutionHeightInRawPixels;
+            }
+        }
+    } catch (...) {
+        WINRT_CachedDisplayModeQueryFailed = true;
+    }
+#endif
+
+    int out_w;
+    int out_h;
+    bool using_display = false;
+
+    if (display_w > 0 && display_h > 0) {
+        using_display = true;
+        out_w = (int)SDL_min(display_w, max_w);
+        out_h = (int)SDL_min(display_h, max_h);
+    } else {
+        out_w = (int)max_w;
+        out_h = (int)max_h;
+    }
+
+    if (!is_xbox_family && !using_display) {
+        WINRT_CachedOutputValid = false;
+        WINRT_CachedOutputWidth = 0;
+        WINRT_CachedOutputHeight = 0;
+        WINRT_CachedUsingDisplayResolution = false;
+        return;
+    }
+
+    WINRT_CachedOutputWidth = out_w;
+    WINRT_CachedOutputHeight = out_h;
+    WINRT_CachedUsingDisplayResolution = using_display;
+    WINRT_CachedOutputValid = true;
+    WINRT_LogOutputResolutionOnce();
+}
+
+static void WINRT_ApplyOutputSizeToPrimaryDisplay(SDL_VideoDevice *_this)
+{
+    if (SDL_GetWinRTDeviceFamily() != SDL_WINRT_DEVICEFAMILY_XBOX) {
+        return;
+    }
+    if (!WINRT_CachedOutputValid || _this->num_displays <= 0) {
+        return;
+    }
+    SDL_VideoDisplay *display = _this->displays[0];
+    const int ow = WINRT_CachedOutputWidth;
+    const int oh = WINRT_CachedOutputHeight;
+    display->desktop_mode.w = ow;
+    display->desktop_mode.h = oh;
+    for (int i = 0; i < display->num_fullscreen_modes; ++i) {
+        SDL_DisplayMode *m = &display->fullscreen_modes[i];
+        m->w = SDL_min(m->w, ow);
+        m->h = SDL_min(m->h, oh);
+    }
+    SDL_UpdateDesktopBounds();
+}
+
+extern "C" bool WINRT_TVOutputSizeOverridesActive(void)
+{
+    if (!WINRT_CachedOutputValid) {
+        return false;
+    }
+    return SDL_GetWinRTDeviceFamily() == SDL_WINRT_DEVICEFAMILY_XBOX;
+}
+
+extern "C" void WINRT_TVOutputOverrideApplyToWindow(SDL_Window *window)
+{
+    if (!WINRT_TVOutputSizeOverridesActive() || !window) {
+        return;
+    }
+    window->last_pixel_w = WINRT_CachedOutputWidth;
+    window->last_pixel_h = WINRT_CachedOutputHeight;
+    window->w = (int)SDL_lroundf(WINRT_PHYSICAL_PIXELS_TO_DIPS((float)WINRT_CachedOutputWidth));
+    window->h = (int)SDL_lroundf(WINRT_PHYSICAL_PIXELS_TO_DIPS((float)WINRT_CachedOutputHeight));
+}
+
+static void WINRT_GetWindowSizeInPixels(SDL_VideoDevice *_this, SDL_Window *window, int *w, int *h)
+{
+    (void)_this;
+    if (WINRT_TVOutputSizeOverridesActive()) {
+        if (w) {
+            *w = WINRT_CachedOutputWidth;
+        }
+        if (h) {
+            *h = WINRT_CachedOutputHeight;
+        }
+        return;
+    }
+    int filter_w, filter_h;
+    if (!w) {
+        w = &filter_w;
+    }
+    if (!h) {
+        h = &filter_h;
+    }
+    *w = window->w;
+    *h = window->h;
+    SDL_VideoDisplay *display = SDL_GetVideoDisplayForWindow(window);
+    const SDL_DisplayMode *mode = ((window->flags & SDL_WINDOW_FULLSCREEN) && SDL_GetWindowFullscreenMode(window))
+                                      ? SDL_GetCurrentDisplayMode(display->id)
+                                      : SDL_GetDesktopDisplayMode(display->id);
+    if (mode) {
+        *w = (int)SDL_ceilf(*w * mode->pixel_density);
+        *h = (int)SDL_ceilf(*h * mode->pixel_density);
+    }
+}
 
 // WinRT driver bootstrap functions
 
@@ -129,6 +358,7 @@ static SDL_VideoDevice *WINRT_CreateDevice(void)
     device->SetDisplayMode = WINRT_SetDisplayMode;
     device->PumpEvents = WINRT_PumpEvents;
     device->SuspendScreenSaver = WINRT_SuspendScreenSaver;
+    device->GetWindowSizeInPixels = WINRT_GetWindowSizeInPixels;
 
 #if NTDDI_VERSION >= NTDDI_WIN10
     device->HasScreenKeyboardSupport = WINRT_HasScreenKeyboardSupport;
@@ -234,9 +464,14 @@ static void SDLCALL WINRT_SetDisplayOrientationsPreference(void *userdata, const
 bool WINRT_VideoInit(SDL_VideoDevice *_this)
 {
     SDL_VideoData *internal = _this->internal;
+
+    WINRT_ResolveOutputSize();
+
     if (!WINRT_InitModes(_this)) {
         return false;
     }
+
+    WINRT_ApplyOutputSizeToPrimaryDisplay(_this);
 
     // Register the hint, SDL_HINT_ORIENTATIONS, with SDL.
     // TODO, WinRT: see if an app's default orientation can be found out via WinRT API(s), then set the initial value of SDL_HINT_ORIENTATIONS accordingly.
@@ -312,8 +547,13 @@ static bool WINRT_AddDisplaysForOutput(SDL_VideoDevice *_this, IDXGIAdapter1 *dx
 
     SDL_zero(modeToMatch);
     modeToMatch.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-    modeToMatch.Width = (dxgiOutputDesc.DesktopCoordinates.right - dxgiOutputDesc.DesktopCoordinates.left);
-    modeToMatch.Height = (dxgiOutputDesc.DesktopCoordinates.bottom - dxgiOutputDesc.DesktopCoordinates.top);
+    if (WINRT_TVOutputSizeOverridesActive()) {
+        modeToMatch.Width = (UINT)WINRT_CachedOutputWidth;
+        modeToMatch.Height = (UINT)WINRT_CachedOutputHeight;
+    } else {
+        modeToMatch.Width = (UINT)(dxgiOutputDesc.DesktopCoordinates.right - dxgiOutputDesc.DesktopCoordinates.left);
+        modeToMatch.Height = (UINT)(dxgiOutputDesc.DesktopCoordinates.bottom - dxgiOutputDesc.DesktopCoordinates.top);
+    }
     hr = dxgiOutput->FindClosestMatchingMode(&modeToMatch, &closestMatch, NULL);
     if (hr == DXGI_ERROR_NOT_CURRENTLY_AVAILABLE) {
         /* DXGI_ERROR_NOT_CURRENTLY_AVAILABLE gets returned by IDXGIOutput::FindClosestMatchingMode
@@ -327,8 +567,13 @@ static bool WINRT_AddDisplaysForOutput(SDL_VideoDevice *_this, IDXGIAdapter1 *dx
         SDL_DisplayMode mode;
         SDL_zero(mode);
         display.name = SDL_strdup("Windows Simulator / Terminal Services Display");
-        mode.w = (dxgiOutputDesc.DesktopCoordinates.right - dxgiOutputDesc.DesktopCoordinates.left);
-        mode.h = (dxgiOutputDesc.DesktopCoordinates.bottom - dxgiOutputDesc.DesktopCoordinates.top);
+        if (WINRT_TVOutputSizeOverridesActive()) {
+            mode.w = WINRT_CachedOutputWidth;
+            mode.h = WINRT_CachedOutputHeight;
+        } else {
+            mode.w = (dxgiOutputDesc.DesktopCoordinates.right - dxgiOutputDesc.DesktopCoordinates.left);
+            mode.h = (dxgiOutputDesc.DesktopCoordinates.bottom - dxgiOutputDesc.DesktopCoordinates.top);
+        }
         mode.format = D3D11_DXGIFormatToSDLPixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM);
         display.desktop_mode = mode;
     } else if (FAILED(hr)) {
@@ -728,6 +973,7 @@ bool WINRT_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_Properti
         window->flags &= ~SDL_WINDOW_HIDDEN;
         SDL_SetMouseFocus(NULL);    // TODO: detect this
         SDL_SetKeyboardFocus(NULL); // TODO: detect this
+        WINRT_TVOutputOverrideApplyToWindow(window);
     } else {
 #endif
         /* WinRT 8.x apps seem to live in an environment where the OS controls the
@@ -758,6 +1004,8 @@ bool WINRT_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_Properti
             window->h = (int)SDL_floorf(data->coreWindow->Bounds.Height);
         }
 #endif
+
+        WINRT_TVOutputOverrideApplyToWindow(window);
 
         WINRT_UpdateWindowFlags(
             window,
