@@ -137,6 +137,12 @@ static void WINRT_ProcessWindowSizeChange() // TODO: Pass an SDL_Window-identify
             }
 #endif
 
+            if (WINRT_TVOutputSizeOverridesActive()) {
+                WINRT_TVOutputOverrideApplyToWindow(window);
+                w = window->w;
+                h = window->h;
+            }
+
             const SDL_WindowFlags latestFlags = WINRT_DetectWindowFlags(window);
             if (latestFlags & SDL_WINDOW_MAXIMIZED) {
                 SDL_SendWindowEvent(window, SDL_EVENT_WINDOW_MAXIMIZED, 0, 0);

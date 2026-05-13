@@ -78,6 +78,8 @@ extern SDL_Window *WINRT_GlobalSDLWindow;
 extern void WINRT_UpdateWindowFlags(SDL_Window *window, SDL_WindowFlags mask);
 #ifdef __cplusplus_winrt
 extern "C" SDL_WindowFlags WINRT_DetectWindowFlags(SDL_Window *window); // detects flags w/o applying them
+extern "C" bool WINRT_TVOutputSizeOverridesActive(void);
+extern "C" void WINRT_TVOutputOverrideApplyToWindow(SDL_Window *window);
 #endif
 
 // Display mode internals
